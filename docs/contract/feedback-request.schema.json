@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "feedback-request",
+  "description": "QuickBite Support contract 1.0.0 — see docs/API_CONTRACT.md",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "trace_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "comment": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 1000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "conversation_id",
+    "message_id",
+    "value"
+  ]
+}

@@ -1,0 +1,1209 @@
+/**
+ * The synthetic QuickBite knowledge base: 26 policy documents, 57 chunks.
+ *
+ * Two fields exist only for the mock and are never part of the API contract:
+ * - `keywords` feeds the mock retriever's scoring so distances behave like a real embedding index.
+ * - `gist` is a self-contained sentence the mock uses to compose answers to unscripted questions.
+ *
+ * Policy numbers (windows, tiers, fees) are referenced by the scripted conversations, so changing a
+ * number here means changing the matching answer text in ./conversations.ts.
+ */
+import type { KnowledgeDocument, SourceDocument } from "@/lib/api/schemas";
+
+export interface FixtureChunk {
+  section: string;
+  text: string;
+  keywords: string[];
+  gist: string;
+}
+
+export interface FixtureDocument {
+  slug: string;
+  title: string;
+  category: string;
+  version: string;
+  effective_date: string;
+  chunks: FixtureChunk[];
+}
+
+export const POLICY_DOCUMENTS: readonly FixtureDocument[] = [
+  {
+    slug: "refunds-and-credits",
+    title: "Refunds & Credits Policy",
+    category: "refunds",
+    version: "v3.2",
+    effective_date: "2026-05-01",
+    chunks: [
+      {
+        section: "When you can claim a refund",
+        text: "QuickBite refunds missing items, incorrect items, undelivered orders, and orders cancelled by the restaurant. Claims must be raised within 2 hours of delivery, or within 24 hours where there is a food safety concern. Every claim is assessed against the order record, the delivery confirmation, and any photos you attach. The decision appears on the order page, usually within 30 minutes of the claim.",
+        keywords: [
+          "refund",
+          "claim",
+          "eligible",
+          "raise",
+          "window",
+          "2 hours",
+          "missing",
+          "incorrect",
+          "undelivered",
+        ],
+        gist: "Refund claims are accepted within 2 hours of delivery, or 24 hours for a food safety concern, and the decision usually appears within 30 minutes.",
+      },
+      {
+        section: "Wallet credit or original payment method",
+        text: "You choose how a refund comes back. A QuickBite Wallet credit is instant and valid for 180 days across any restaurant. A refund to the original payment method is processed by your bank on its own schedule. Once a refund to the original method has started processing it cannot be redirected to the Wallet.",
+        keywords: [
+          "refund",
+          "method",
+          "wallet",
+          "credit",
+          "original",
+          "payment",
+          "instant",
+          "choose",
+        ],
+        gist: "A refund can come back as an instant QuickBite Wallet credit or go to your original payment method.",
+      },
+      {
+        section: "Partial refunds and goodwill credits",
+        text: "When only part of an order is affected, only the affected item value is refunded, and delivery and platform fees stay charged. Fees are refunded when the whole order failed or the restaurant cancelled it. Goodwill credits may be added on top where an order went badly wrong across several items, at the reviewing agent's discretion.",
+        keywords: ["partial", "refund", "goodwill", "fees", "affected", "item", "value"],
+        gist: "Partial refunds cover only the affected items, and fees are refunded only when the whole order failed.",
+      },
+    ],
+  },
+  {
+    slug: "refund-timelines",
+    title: "Refund Methods & Processing Timelines",
+    category: "refunds",
+    version: "v2.4",
+    effective_date: "2026-04-15",
+    chunks: [
+      {
+        section: "How long a refund takes",
+        text: "Wallet credits appear immediately. UPI refunds usually reach your account in 2 to 4 business days. Credit card, debit card, and netbanking refunds take 5 to 7 business days depending on your bank. Cash-on-delivery orders are refunded to the QuickBite Wallet because there is no payment instrument to return money to. Every refund has a reference id on the order page that your bank can trace.",
+        keywords: [
+          "refund",
+          "long",
+          "take",
+          "timeline",
+          "days",
+          "upi",
+          "card",
+          "netbanking",
+          "cash",
+          "reference",
+        ],
+        gist: "Wallet refunds are instant, UPI takes 2 to 4 business days, and card or netbanking refunds take 5 to 7 business days.",
+      },
+      {
+        section: "If a refund is delayed",
+        text: "If a refund has not arrived after the stated window, share the refund reference id from the order page with support and we raise a payment trace with the processor. Traces take up to 5 working days to come back. Banks occasionally post refunds against the original transaction rather than as a new line, so it is worth checking your statement for a reversal before raising a trace.",
+        keywords: [
+          "refund",
+          "delayed",
+          "not",
+          "received",
+          "missing",
+          "trace",
+          "reference",
+          "bank",
+          "statement",
+        ],
+        gist: "If a refund passes its stated window, quote the refund reference id and support will raise a payment trace that takes up to 5 working days.",
+      },
+    ],
+  },
+  {
+    slug: "missing-items",
+    title: "Missing or Incorrect Items",
+    category: "orders",
+    version: "v3.0",
+    effective_date: "2026-06-01",
+    chunks: [
+      {
+        section: "Missing items",
+        text: "If something you paid for is not in the bag, report it from the order page within 2 hours of delivery. Missing items are refunded at full item value including the tax charged on that item. No photo is required for a missing item, although a photo of the bag and packaging helps us give the restaurant specific feedback.",
+        keywords: [
+          "missing",
+          "item",
+          "not",
+          "delivered",
+          "bag",
+          "forgot",
+          "left out",
+          "refund",
+          "full",
+          "value",
+          "photo",
+        ],
+        gist: "Missing items are refunded at full item value when reported within 2 hours, and no photo is required.",
+      },
+      {
+        section: "Wrong or substituted items",
+        text: "If the restaurant sent the wrong dish, report it with a photo of what arrived. A confirmed wrong item is refunded in full and you do not need to return the food. If a restaurant substituted an item without telling you first, the substitution is treated as a wrong item and refunded the same way.",
+        keywords: [
+          "wrong",
+          "incorrect",
+          "item",
+          "dish",
+          "substituted",
+          "different",
+          "photo",
+          "refund",
+          "return",
+        ],
+        gist: "Wrong dishes and unannounced substitutions are refunded in full with a photo, and the food does not need to be returned.",
+      },
+      {
+        section: "Repeat claims",
+        text: "Missing-item claims are counted per account. More than three claims in a 30 day period sends later claims to manual review, which can add up to 24 hours to the decision. This is a fraud control, not a judgement about a specific order, and genuine claims are still refunded after review.",
+        keywords: ["repeat", "claims", "three", "30 days", "manual", "review", "fraud", "account"],
+        gist: "More than three missing-item claims in 30 days routes later claims to manual review, adding up to 24 hours.",
+      },
+    ],
+  },
+  {
+    slug: "food-quality",
+    title: "Food Quality & Temperature Complaints",
+    category: "orders",
+    version: "v2.2",
+    effective_date: "2026-03-20",
+    chunks: [
+      {
+        section: "Cold, spilled, or poorly packaged food",
+        text: "Temperature and packaging complaints are assessed case by case, so attach a photo within 2 hours of delivery. A verified complaint is compensated up to 50 percent of the affected item value. Where food is inedible, spilled inside the bag, or has leaked through the packaging, up to 100 percent of the item value is refunded.",
+        keywords: [
+          "cold",
+          "lukewarm",
+          "temperature",
+          "spilled",
+          "leaked",
+          "packaging",
+          "quality",
+          "photo",
+          "inedible",
+          "soggy",
+        ],
+        gist: "Cold or damaged food is compensated up to 50 percent of the item value with a photo within 2 hours, rising to 100 percent if it is inedible or spilled.",
+      },
+      {
+        section: "Taste and preparation",
+        text: "How a dish is seasoned or prepared is the restaurant's decision, so taste preferences such as too spicy or too salty are not refundable. The feedback is still passed to the restaurant, and repeated quality flags across customers trigger a review of the restaurant's listing.",
+        keywords: [
+          "taste",
+          "spicy",
+          "salty",
+          "bland",
+          "preparation",
+          "not",
+          "refundable",
+          "feedback",
+        ],
+        gist: "Taste preferences are not refundable, though the feedback is passed to the restaurant.",
+      },
+    ],
+  },
+  {
+    slug: "late-delivery-compensation",
+    title: "Late Delivery Compensation",
+    category: "delivery",
+    version: "v2.1",
+    effective_date: "2026-06-01",
+    chunks: [
+      {
+        section: "Compensation tiers",
+        text: "Lateness is measured against the delivery time promised at checkout. Between 10 and 20 minutes late, you receive a 40 rupee QuickBite Wallet credit. Between 21 and 40 minutes late, the delivery fee is refunded and a 75 rupee credit is added. More than 40 minutes late, you receive 50 percent of the food subtotal as credit, capped at 300 rupees. Credits are applied automatically within 2 hours of delivery and do not need to be claimed.",
+        keywords: [
+          "late",
+          "delay",
+          "delayed",
+          "compensation",
+          "credit",
+          "tier",
+          "minutes",
+          "promised",
+          "automatic",
+        ],
+        gist: "Late orders earn tiered credits: 40 rupees for 10 to 20 minutes, the delivery fee plus 75 rupees for 21 to 40 minutes, and 50 percent of the food subtotal capped at 300 rupees beyond 40 minutes.",
+      },
+      {
+        section: "When compensation does not apply",
+        text: "Compensation is not applied while a city-level weather or safety advisory is active, when you change the delivery address after checkout, when the rider could not reach you for more than 10 minutes, or when a longer preparation time was disclosed and accepted at checkout. Scheduled orders are measured against the end of the chosen slot rather than the time the order was placed.",
+        keywords: [
+          "exemption",
+          "not",
+          "apply",
+          "weather",
+          "advisory",
+          "address",
+          "change",
+          "unreachable",
+          "scheduled",
+          "exception",
+        ],
+        gist: "Late credits do not apply during weather advisories, after an address change, when the rider cannot reach you for over 10 minutes, or when a longer prep time was accepted at checkout.",
+      },
+      {
+        section: "Very late orders and Plus members",
+        text: "If an order is more than 40 minutes late and has not yet been handed to you, you can cancel it from the order page for a full refund including all fees. QuickBite Plus members receive double the credit on every tier. Credits land in the Wallet and are applied to your next order automatically.",
+        keywords: [
+          "very",
+          "late",
+          "40 minutes",
+          "cancel",
+          "full",
+          "refund",
+          "plus",
+          "double",
+          "credit",
+        ],
+        gist: "An order more than 40 minutes late can be cancelled for a full refund if it has not been handed over, and Plus members receive double credits.",
+      },
+    ],
+  },
+  {
+    slug: "delivery-tracking",
+    title: "Delivery Estimates & Live Order Tracking",
+    category: "delivery",
+    version: "v1.9",
+    effective_date: "2026-02-10",
+    chunks: [
+      {
+        section: "How ETAs are calculated",
+        text: "Every order shows a live estimate built from the restaurant's current preparation time, rider availability, distance, and traffic. The estimate shown at checkout is the promised time used for late-delivery compensation. The live estimate on the tracking screen moves as conditions change, and a moving estimate does not change what was promised at checkout.",
+        keywords: [
+          "eta",
+          "estimate",
+          "tracking",
+          "track",
+          "where",
+          "order",
+          "time",
+          "promised",
+          "live",
+          "arrive",
+        ],
+        gist: "The checkout estimate is the promised time used for compensation, while the live tracking estimate updates as conditions change.",
+      },
+      {
+        section: "Order states",
+        text: "An order moves through placed, confirmed, being prepared, out for delivery, and delivered. Once a rider picks the order up you can see their first name and live position on the map. Orders are sometimes batched with one other nearby order, which can add a short detour that is already included in the live estimate.",
+        keywords: [
+          "status",
+          "state",
+          "placed",
+          "confirmed",
+          "preparing",
+          "out for delivery",
+          "delivered",
+          "batched",
+          "rider",
+          "map",
+        ],
+        gist: "Orders move through placed, confirmed, preparing, out for delivery, and delivered, with live rider position after pickup.",
+      },
+    ],
+  },
+  {
+    slug: "cancellations-customer",
+    title: "Customer-Initiated Cancellations",
+    category: "orders",
+    version: "v2.6",
+    effective_date: "2026-05-18",
+    chunks: [
+      {
+        section: "Cancellation charges",
+        text: "You can cancel free of charge until the restaurant confirms the order, which is usually within 60 seconds. After confirmation and before pickup, the food subtotal is charged because the kitchen has started cooking, while delivery and platform fees are refunded. Once a rider has collected the order it can no longer be cancelled.",
+        keywords: [
+          "cancel",
+          "cancellation",
+          "charge",
+          "fee",
+          "confirmed",
+          "kitchen",
+          "started",
+          "cooking",
+          "pickup",
+          "free",
+        ],
+        gist: "Cancelling is free until the restaurant confirms; after that the food subtotal is charged, and once a rider collects the order it cannot be cancelled.",
+      },
+      {
+        section: "Exceptions to cancellation charges",
+        text: "There is no cancellation charge when the order is already more than 40 minutes late, when the restaurant cannot complete the order, or when a service pause is active in your area. Scheduled orders can be cancelled free of charge up to 60 minutes before the chosen slot.",
+        keywords: [
+          "exception",
+          "cancel",
+          "free",
+          "late",
+          "40 minutes",
+          "scheduled",
+          "slot",
+          "pause",
+          "waived",
+        ],
+        gist: "Cancellation charges are waived for orders over 40 minutes late, restaurant-side failures, active service pauses, and scheduled orders cancelled more than 60 minutes ahead.",
+      },
+    ],
+  },
+  {
+    slug: "cancellations-restaurant",
+    title: "Restaurant & Platform Cancellations",
+    category: "orders",
+    version: "v2.0",
+    effective_date: "2026-04-02",
+    chunks: [
+      {
+        section: "When a restaurant cancels",
+        text: "If a restaurant cancels after confirming, because an item ran out, the kitchen closed early, or equipment failed, you are refunded in full including every fee, automatically. A 50 rupee apology credit is added to your Wallet at the same time. Nothing needs to be claimed and no photo or report is required.",
+        keywords: [
+          "restaurant",
+          "cancelled",
+          "cancel",
+          "unavailable",
+          "out of stock",
+          "closed",
+          "refund",
+          "full",
+          "automatic",
+          "apology",
+        ],
+        gist: "Restaurant cancellations are refunded in full automatically, including all fees, plus a 50 rupee apology credit.",
+      },
+      {
+        section: "When QuickBite cancels",
+        text: "We cancel an order when no rider can be assigned, when the delivery address turns out to be outside a serviceable zone, or when a safety advisory pauses deliveries in the area. The refund is full and automatic. Wallet refunds are instant, while refunds to the original payment method follow the usual bank timelines.",
+        keywords: [
+          "quickbite",
+          "cancelled",
+          "no rider",
+          "unserviceable",
+          "zone",
+          "advisory",
+          "refund",
+          "automatic",
+        ],
+        gist: "QuickBite-side cancellations, such as no available rider or an unserviceable address, are refunded in full automatically.",
+      },
+    ],
+  },
+  {
+    slug: "allergens",
+    title: "Allergen Information & Dietary Requests",
+    category: "safety",
+    version: "v1.7",
+    effective_date: "2026-01-25",
+    chunks: [
+      {
+        section: "Where allergen information comes from",
+        text: "Ingredient and allergen information is supplied by the restaurant and shown on the menu item where the restaurant has provided it. QuickBite does not independently verify it. Most kitchens are shared, so the presence of traces through cross-contamination cannot be ruled out for any dish, including dishes marked vegan or gluten free.",
+        keywords: [
+          "allergen",
+          "allergy",
+          "ingredient",
+          "nuts",
+          "gluten",
+          "dairy",
+          "vegan",
+          "contain",
+          "cross-contamination",
+          "menu",
+        ],
+        gist: "Allergen details are supplied by the restaurant and not independently verified, and cross-contamination cannot be ruled out in shared kitchens.",
+      },
+      {
+        section: "Requesting a change for an allergy",
+        text: "Add allergy notes in the order instructions before checkout. Restaurants honour these requests at their discretion and cannot guarantee an allergen-free preparation. If you have a severe allergy, call the restaurant directly before ordering using the number on the order page, and consider ordering dishes that do not rely on a substitution.",
+        keywords: [
+          "allergy",
+          "request",
+          "note",
+          "instruction",
+          "severe",
+          "call",
+          "restaurant",
+          "substitution",
+          "safe",
+        ],
+        gist: "Allergy notes are honoured at the restaurant's discretion, so call the restaurant directly for a severe allergy.",
+      },
+      {
+        section: "If a dish contains an undeclared allergen",
+        text: "If a dish contains an allergen that the menu said it did not, stop eating and report it within 24 hours. These reports are handled as food safety cases rather than ordinary refunds: the item is refunded in full, the report goes to our safety team the same day, and the restaurant must respond before the listing stays open.",
+        keywords: [
+          "undeclared",
+          "allergen",
+          "reaction",
+          "report",
+          "safety",
+          "24 hours",
+          "refund",
+          "full",
+        ],
+        gist: "A dish containing an undeclared allergen is refunded in full and escalated to the safety team when reported within 24 hours.",
+      },
+    ],
+  },
+  {
+    slug: "food-safety",
+    title: "Food Safety & Foreign Object Reports",
+    category: "safety",
+    version: "v1.5",
+    effective_date: "2026-01-25",
+    chunks: [
+      {
+        section: "Reporting a safety concern",
+        text: "If you find a foreign object in your food, or you believe an order made you ill, stop eating immediately, keep the food and packaging, photograph what you found, and report it within 24 hours. Safety reports bypass the normal refund queue and reach the QuickBite safety team the same day.",
+        keywords: [
+          "food safety",
+          "foreign",
+          "object",
+          "hair",
+          "plastic",
+          "ill",
+          "sick",
+          "unsafe",
+          "report",
+          "24 hours",
+        ],
+        gist: "Food safety reports should be raised within 24 hours with photos, and they bypass the normal refund queue.",
+      },
+      {
+        section: "What happens after a safety report",
+        text: "A confirmed safety report is refunded at full order value, including fees. The restaurant is contacted within 24 hours and must explain the incident. Repeated reports trigger a kitchen audit, and the listing can be suspended while the audit runs. If you needed medical attention, share the documentation with support and the case is escalated to our food safety lead.",
+        keywords: [
+          "safety",
+          "report",
+          "refund",
+          "full",
+          "audit",
+          "suspended",
+          "medical",
+          "escalated",
+        ],
+        gist: "A confirmed food safety report is refunded at full order value and triggers a restaurant audit.",
+      },
+    ],
+  },
+  {
+    slug: "rider-conduct",
+    title: "Rider Conduct & Safety Standards",
+    category: "riders",
+    version: "v2.3",
+    effective_date: "2026-05-05",
+    chunks: [
+      {
+        section: "Who delivers your order",
+        text: "Delivery partners are independent contractors who pass identity and background checks before they can accept orders. You see a first name and vehicle type on the tracking screen. Full names, phone numbers, and addresses are masked on both sides, and calls run through a relay number that stops working shortly after delivery.",
+        keywords: [
+          "rider",
+          "delivery partner",
+          "who",
+          "background",
+          "verified",
+          "contractor",
+          "name",
+          "masked",
+          "relay",
+          "number",
+        ],
+        gist: "Delivery partners are background-verified independent contractors, and contact details are masked on both sides through a relay number.",
+      },
+      {
+        section: "Conduct standards and reporting",
+        text: "Delivery partners must not enter your home, ask for any payment beyond the app, or handle your food after handover. Reports of unsafe driving, rudeness, or harassment can be filed for up to 48 hours after delivery and are investigated within 3 working days. Serious reports remove the partner from your future orders while the investigation runs.",
+        keywords: [
+          "rider",
+          "conduct",
+          "rude",
+          "behaviour",
+          "harassment",
+          "unsafe",
+          "driving",
+          "report",
+          "complaint",
+          "investigate",
+        ],
+        gist: "Riders must not enter your home or ask for extra payment, and conduct reports filed within 48 hours are investigated within 3 working days.",
+      },
+    ],
+  },
+  {
+    slug: "contactless-delivery",
+    title: "Contactless & Doorstep Delivery",
+    category: "delivery",
+    version: "v1.4",
+    effective_date: "2026-02-10",
+    chunks: [
+      {
+        section: "How contactless delivery works",
+        text: "Contactless delivery is the default for prepaid orders. The rider places the order at your door, steps back, and confirms the delivery in the app. You can switch to hand-to-hand delivery from the tracking screen any time before pickup. Cash on delivery always requires contact because payment has to change hands.",
+        keywords: [
+          "contactless",
+          "doorstep",
+          "door",
+          "hand",
+          "prepaid",
+          "default",
+          "switch",
+          "no contact",
+        ],
+        gist: "Contactless delivery is the default for prepaid orders and can be switched to hand-to-hand before pickup.",
+      },
+      {
+        section: "Leave-at-door instructions",
+        text: "Drop instructions such as a gate code or a neighbour's flat can be added at checkout and are shown to the rider. Once a doorstep drop has been confirmed with a photo, QuickBite is not responsible for an order taken by someone else, so choose hand-to-hand delivery if your entrance is shared or unattended.",
+        keywords: [
+          "leave",
+          "door",
+          "instruction",
+          "gate",
+          "stolen",
+          "taken",
+          "missing",
+          "responsibility",
+          "shared",
+        ],
+        gist: "After a confirmed doorstep drop QuickBite is not responsible for an order taken by someone else, so hand-to-hand is safer for shared entrances.",
+      },
+    ],
+  },
+  {
+    slug: "failed-delivery",
+    title: "Failed Delivery Attempts & Unreachable Customers",
+    category: "delivery",
+    version: "v1.8",
+    effective_date: "2026-03-08",
+    chunks: [
+      {
+        section: "Delivery attempts",
+        text: "The rider calls once on arrival and waits up to 5 minutes at the doorstep, or up to 10 minutes where a gated community delays entry. If you cannot be reached in that window the order is marked undeliverable. Prepared food is not returned to the restaurant, because it cannot be sold again.",
+        keywords: [
+          "failed",
+          "attempt",
+          "unreachable",
+          "call",
+          "wait",
+          "5 minutes",
+          "gated",
+          "undeliverable",
+          "missed",
+        ],
+        gist: "Riders call once and wait up to 5 minutes, or 10 at a gated entrance, before an order is marked undeliverable.",
+      },
+      {
+        section: "Refunds for failed deliveries",
+        text: "An undeliverable order is not refunded when the address was wrong or incomplete, or when you could not be reached. It is refunded in full when the rider did not attempt delivery, went to a different address, or marked the order delivered without handing it over. Doorstep photos and rider location history are used to decide.",
+        keywords: [
+          "failed",
+          "delivery",
+          "refund",
+          "not",
+          "received",
+          "never",
+          "arrived",
+          "marked",
+          "delivered",
+          "fault",
+        ],
+        gist: "A failed delivery is refunded only when the rider was at fault, not when the address was wrong or you were unreachable.",
+      },
+    ],
+  },
+  {
+    slug: "promo-codes",
+    title: "Promo Codes & Offer Terms",
+    category: "promotions",
+    version: "v3.1",
+    effective_date: "2026-06-10",
+    chunks: [
+      {
+        section: "Using a promo code",
+        text: "Promo codes apply to the food subtotal, require the stated minimum order value, and work once per account unless the offer says otherwise. Only one code can be applied per order. Codes cannot be combined with a QuickBite Plus discount on the same line item, and the app applies whichever gives you the larger saving.",
+        keywords: [
+          "promo",
+          "code",
+          "coupon",
+          "offer",
+          "discount",
+          "apply",
+          "minimum",
+          "once",
+          "combine",
+        ],
+        gist: "One promo code applies per order, against the food subtotal, once per account, and cannot be combined with a Plus discount on the same item.",
+      },
+      {
+        section: "Promo codes and cancellations",
+        text: "If an order is cancelled by the restaurant or by QuickBite, a single-use code is reinstated to your account within 24 hours and can be used again on any eligible order. If you cancel the order yourself after the restaurant confirmed it, the code counts as used. Expired codes cannot be reissued even when the cancellation was not your fault.",
+        keywords: [
+          "promo",
+          "code",
+          "cancelled",
+          "reinstated",
+          "back",
+          "reissue",
+          "used",
+          "expired",
+          "single-use",
+        ],
+        gist: "A single-use promo code is reinstated within 24 hours when the restaurant or QuickBite cancels, but counts as used if you cancel yourself.",
+      },
+      {
+        section: "Refunds on discounted orders",
+        text: "Refunds are calculated on what you actually paid, not on the menu price. The discount is spread proportionally across the items in the order, so an item bought with a 20 percent discount is refunded at 80 percent of its menu price. Wallet credits used on the order are returned as Wallet credits.",
+        keywords: [
+          "refund",
+          "discount",
+          "discounted",
+          "proportional",
+          "paid",
+          "menu",
+          "price",
+          "credit",
+        ],
+        gist: "Refunds on discounted orders are based on what you paid, with the discount spread proportionally across items.",
+      },
+    ],
+  },
+  {
+    slug: "plus-membership",
+    title: "QuickBite Plus Membership",
+    category: "membership",
+    version: "v2.5",
+    effective_date: "2026-05-20",
+    chunks: [
+      {
+        section: "What Plus includes",
+        text: "QuickBite Plus costs 149 rupees a month or 899 rupees a year. It waives the delivery fee on orders above 199 rupees within 7 kilometres, doubles every late-delivery credit, and routes your support conversations to a priority queue. Plus does not remove surge pricing during peak hours or bad weather.",
+        keywords: [
+          "plus",
+          "membership",
+          "subscription",
+          "benefit",
+          "free delivery",
+          "priority",
+          "double",
+          "credit",
+          "price",
+        ],
+        gist: "Plus costs 149 rupees a month or 899 a year and waives delivery fees above 199 rupees, doubles late credits, and gives priority support.",
+      },
+      {
+        section: "Billing and cancellation",
+        text: "Plus renews automatically on the same date each cycle. You can cancel at any time and the benefits continue to the end of the paid cycle; the current cycle is not refunded. If you cancel within 48 hours of a renewal and have not used a Plus benefit in that cycle, the renewal is refunded in full.",
+        keywords: [
+          "plus",
+          "billing",
+          "renew",
+          "cancel",
+          "subscription",
+          "refund",
+          "cycle",
+          "48 hours",
+        ],
+        gist: "Plus renews automatically and can be cancelled any time, with a refund only within 48 hours of renewal if no benefit was used.",
+      },
+    ],
+  },
+  {
+    slug: "payments",
+    title: "Payment Methods & Failed Transactions",
+    category: "payments",
+    version: "v2.7",
+    effective_date: "2026-04-28",
+    chunks: [
+      {
+        section: "Accepted payment methods",
+        text: "QuickBite accepts UPI, credit and debit cards, netbanking, QuickBite Wallet balance, and cash on delivery where the restaurant and zone support it. Cash is not available for orders above 1,500 rupees or in some zones. Saved cards are tokenised, so QuickBite never stores your full card number.",
+        keywords: [
+          "payment",
+          "method",
+          "upi",
+          "card",
+          "netbanking",
+          "cash",
+          "wallet",
+          "accepted",
+          "tokenised",
+        ],
+        gist: "QuickBite accepts UPI, cards, netbanking, Wallet balance, and cash on delivery below 1,500 rupees where supported.",
+      },
+      {
+        section: "Payment failed but money was debited",
+        text: "When a payment fails the order is not placed, and the bank normally reverses the hold within 5 to 7 business days with no action from you. Do not retry the payment more than twice, because each attempt can place a separate hold. If the money has not come back after 7 business days, share the bank reference with support and we raise a trace with the payment gateway.",
+        keywords: [
+          "payment",
+          "failed",
+          "debited",
+          "deducted",
+          "money",
+          "taken",
+          "no order",
+          "reversed",
+          "hold",
+          "retry",
+        ],
+        gist: "A failed payment does not create an order, and the bank usually reverses the hold within 5 to 7 business days.",
+      },
+    ],
+  },
+  {
+    slug: "wallet",
+    title: "QuickBite Wallet & Credit Expiry",
+    category: "payments",
+    version: "v1.6",
+    effective_date: "2026-03-15",
+    chunks: [
+      {
+        section: "How Wallet credits are used",
+        text: "Wallet credits are applied automatically to your next order, oldest credit first, and can cover the food subtotal as well as fees. Credits are valid for 180 days from the date they are issued. They are tied to your account and cannot be transferred to another account or withdrawn to a bank account.",
+        keywords: [
+          "wallet",
+          "credit",
+          "balance",
+          "expiry",
+          "expire",
+          "180 days",
+          "transfer",
+          "withdraw",
+          "automatic",
+        ],
+        gist: "Wallet credits apply automatically to your next order, are valid for 180 days, and cannot be transferred or withdrawn.",
+      },
+      {
+        section: "Wallet refunds versus payment refunds",
+        text: "A refund sent to the Wallet is usable immediately, which is why it is offered as the fast option. A refund already sent to your original payment method cannot later be moved into the Wallet. Your balance and the expiry date of each credit are listed under Account and then QuickBite Wallet.",
+        keywords: ["wallet", "refund", "instant", "faster", "move", "balance", "expiry", "account"],
+        gist: "Wallet refunds are instant, while a refund already sent to a payment method cannot be moved into the Wallet.",
+      },
+    ],
+  },
+  {
+    slug: "account-security",
+    title: "Account Security & Unauthorised Orders",
+    category: "account",
+    version: "v2.8",
+    effective_date: "2026-06-05",
+    chunks: [
+      {
+        section: "Reporting an order you did not place",
+        text: "If an order appears that you did not place, report it within 24 hours. We freeze the order when the restaurant has not started preparing it, sign out every device on the account, and require a password reset. Confirmed unauthorised orders are refunded in full, including any tip.",
+        keywords: [
+          "unauthorised",
+          "not",
+          "place",
+          "order",
+          "hacked",
+          "someone",
+          "else",
+          "fraud",
+          "report",
+          "freeze",
+          "refund",
+        ],
+        gist: "An order you did not place should be reported within 24 hours; it is frozen where possible, all devices are signed out, and confirmed cases are refunded in full.",
+      },
+      {
+        section: "How to keep the account safe",
+        text: "QuickBite staff never ask for your OTP, card CVV, UPI PIN, or password, and a refund never requires you to install an app or share your screen. We only contact you from in-app chat or a verified number shown on the order page. Report anyone who asks for these details.",
+        keywords: [
+          "security",
+          "otp",
+          "cvv",
+          "pin",
+          "password",
+          "scam",
+          "phishing",
+          "fraud",
+          "share",
+          "screen",
+        ],
+        gist: "QuickBite never asks for an OTP, CVV, UPI PIN, or screen sharing, and refunds never require installing anything.",
+      },
+    ],
+  },
+  {
+    slug: "account-deletion",
+    title: "Account Deletion & Data Requests",
+    category: "account",
+    version: "v1.3",
+    effective_date: "2026-02-01",
+    chunks: [
+      {
+        section: "Deleting your account",
+        text: "Request deletion from Account, then Privacy, then Delete account. The account is locked immediately and deleted after 30 days, and signing in during that window cancels the request. Open orders, active Plus subscriptions, and unresolved refund claims have to be settled before deletion can start.",
+        keywords: [
+          "delete",
+          "account",
+          "deletion",
+          "close",
+          "remove",
+          "30 days",
+          "lock",
+          "cancel",
+          "privacy",
+        ],
+        gist: "Account deletion locks the account immediately and completes after 30 days, and signing in during that window cancels it.",
+      },
+      {
+        section: "Data we keep and data you can export",
+        text: "Invoices and tax records are retained for 7 years because the law requires it, with personal identifiers removed where possible. You can export your order history and personal data from the same privacy screen, and the export is emailed within 30 days of the request.",
+        keywords: [
+          "data",
+          "export",
+          "privacy",
+          "retain",
+          "invoice",
+          "tax",
+          "7 years",
+          "personal",
+          "gdpr",
+        ],
+        gist: "Invoices are retained for 7 years to meet tax law, and a full data export is emailed within 30 days of the request.",
+      },
+    ],
+  },
+  {
+    slug: "scheduled-orders",
+    title: "Scheduled Orders",
+    category: "orders",
+    version: "v1.2",
+    effective_date: "2026-01-18",
+    chunks: [
+      {
+        section: "Scheduling an order",
+        text: "Orders can be scheduled up to 3 days ahead in 30 minute slots. The restaurant is notified close to the slot rather than when you place the order, so menu prices are taken at the time of ordering. Lateness for a scheduled order is measured from the end of the slot, not from when the order was placed.",
+        keywords: [
+          "schedule",
+          "scheduled",
+          "advance",
+          "later",
+          "slot",
+          "preorder",
+          "3 days",
+          "30 minute",
+        ],
+        gist: "Orders can be scheduled 3 days ahead in 30 minute slots, and lateness is measured from the end of the slot.",
+      },
+      {
+        section: "Changing a scheduled order",
+        text: "A scheduled order can be cancelled or changed free of charge up to 60 minutes before the slot begins. Inside that hour the normal cancellation charges apply, because the kitchen may already have started preparing. Scheduled orders are not placed if the restaurant is closed at the slot time, and they are refunded in full automatically.",
+        keywords: [
+          "schedule",
+          "change",
+          "cancel",
+          "free",
+          "60 minutes",
+          "slot",
+          "closed",
+          "refund",
+        ],
+        gist: "Scheduled orders can be changed or cancelled free until 60 minutes before the slot.",
+      },
+    ],
+  },
+  {
+    slug: "delivery-fees",
+    title: "Delivery Fees, Surge & Small-Order Charges",
+    category: "payments",
+    version: "v2.9",
+    effective_date: "2026-06-12",
+    chunks: [
+      {
+        section: "What you are charged for delivery",
+        text: "The delivery fee is distance based, normally between 25 and 65 rupees, and is always shown before you pay. During heavy rain, peak hours, or low rider availability a surge is added and labelled at checkout. A 20 rupee small-order fee applies when the food subtotal is below 150 rupees.",
+        keywords: [
+          "delivery",
+          "fee",
+          "charge",
+          "surge",
+          "distance",
+          "peak",
+          "rain",
+          "small order",
+          "platform",
+        ],
+        gist: "Delivery fees run 25 to 65 rupees by distance, with a labelled surge at peak times and a 20 rupee small-order fee below 150 rupees.",
+      },
+      {
+        section: "When fees are refunded",
+        text: "Delivery and platform fees are refunded when the whole order fails, when the restaurant or QuickBite cancels, and when a late order reaches the 21 minute compensation tier. Fees stay charged on partial refunds, because the delivery still happened. Surge amounts are refunded on the same basis as the delivery fee.",
+        keywords: [
+          "fee",
+          "refund",
+          "delivery",
+          "platform",
+          "surge",
+          "whole",
+          "order",
+          "partial",
+          "tier",
+        ],
+        gist: "Delivery and platform fees are refunded when a whole order fails or a late order reaches the 21 minute tier, but not on partial refunds.",
+      },
+    ],
+  },
+  {
+    slug: "tipping",
+    title: "Tipping Delivery Partners",
+    category: "riders",
+    version: "v1.1",
+    effective_date: "2026-01-10",
+    chunks: [
+      {
+        section: "How tips reach the rider",
+        text: "Tips go to the delivery partner in full and QuickBite takes no commission on them. You can add a tip at checkout, or for up to 2 hours after delivery from the order page. Tips are paid out with the partner's regular payout cycle.",
+        keywords: [
+          "tip",
+          "tipping",
+          "rider",
+          "delivery partner",
+          "full",
+          "commission",
+          "add",
+          "after",
+        ],
+        gist: "Tips reach the delivery partner in full and can be added at checkout or within 2 hours after delivery.",
+      },
+      {
+        section: "Tip refunds",
+        text: "A tip is refunded only when the order is cancelled before pickup, or when a delivery is confirmed as never attempted. A tip cannot be removed once delivery has been confirmed, because it has already been assigned to the partner. Tips are refunded to the Wallet by default so they arrive immediately.",
+        keywords: ["tip", "refund", "remove", "cancel", "back", "mistake", "wallet"],
+        gist: "Tips are refunded only if the order was cancelled before pickup or the delivery never happened.",
+      },
+    ],
+  },
+  {
+    slug: "restricted-items",
+    title: "Restricted Items & Age-Verified Delivery",
+    category: "safety",
+    version: "v1.0",
+    effective_date: "2026-04-20",
+    chunks: [
+      {
+        section: "Alcohol and age verification",
+        text: "Alcohol is delivered only in zones where local law permits it and always requires an identity check at the door showing the recipient is 21 or older. The name on the ID does not have to match the account, but the person accepting must be present and sober. Tobacco and vaping products are not delivered at all.",
+        keywords: [
+          "alcohol",
+          "beer",
+          "wine",
+          "age",
+          "id",
+          "verification",
+          "21",
+          "restricted",
+          "tobacco",
+          "cigarette",
+        ],
+        gist: "Alcohol delivery requires a doorstep ID check showing the recipient is 21 or older, and tobacco is not delivered.",
+      },
+      {
+        section: "If age verification fails",
+        text: "If nobody of legal age can show identification, the rider must return the alcohol. The alcohol value and the delivery fee are not refunded, because the items cannot be resold. Any food in the same order is delivered as usual and is unaffected.",
+        keywords: [
+          "age",
+          "verification",
+          "failed",
+          "id",
+          "refuse",
+          "return",
+          "alcohol",
+          "not",
+          "refunded",
+        ],
+        gist: "If nobody can show valid identification, the alcohol is returned and its value is not refunded.",
+      },
+    ],
+  },
+  {
+    slug: "reviews",
+    title: "Ratings, Reviews & Photo Guidelines",
+    category: "community",
+    version: "v1.4",
+    effective_date: "2026-02-22",
+    chunks: [
+      {
+        section: "Rating an order",
+        text: "You can rate an order for 24 hours after delivery, with separate ratings for the food and the delivery. Ratings are anonymous to restaurants and delivery partners, and a low rating never affects the outcome of a refund claim. Delivery ratings do not affect a partner's pay for the order.",
+        keywords: ["rating", "rate", "review", "star", "anonymous", "24 hours", "feedback"],
+        gist: "Orders can be rated for 24 hours after delivery, anonymously, and ratings never affect refund outcomes.",
+      },
+      {
+        section: "What we remove",
+        text: "Reviews are removed when they contain abuse, threats, discriminatory language, or someone's personal data, and when the content is unrelated to the order. Photos must show the food or packaging from your own order. Removals can be appealed once through support.",
+        keywords: [
+          "review",
+          "removed",
+          "guideline",
+          "abuse",
+          "photo",
+          "personal data",
+          "appeal",
+          "moderation",
+        ],
+        gist: "Reviews containing abuse, personal data, or content unrelated to the order are removed, and a removal can be appealed once.",
+      },
+    ],
+  },
+  {
+    slug: "fair-use",
+    title: "Fair Use & Refund Abuse Prevention",
+    category: "account",
+    version: "v1.9",
+    effective_date: "2026-05-30",
+    chunks: [
+      {
+        section: "How claims are pattern-checked",
+        text: "Refund claims are pattern-checked across the account rather than judged one by one. More than three claims in 30 days, or a claim rate far above comparable accounts, routes later claims to manual review with a response time of up to 24 hours. Genuine claims are still paid after review.",
+        keywords: [
+          "fair use",
+          "abuse",
+          "pattern",
+          "claims",
+          "three",
+          "30 days",
+          "manual",
+          "review",
+          "limit",
+        ],
+        gist: "More than three refund claims in 30 days routes later claims to manual review, with a decision inside 24 hours.",
+      },
+      {
+        section: "Restrictions and appeals",
+        text: "An account with confirmed abuse can lose self-serve refunds, promo code eligibility, or cash on delivery, and a repeat case can be suspended. A human reviews every restriction before it is applied, you are told which restriction is active, and the decision can be appealed once through support.",
+        keywords: [
+          "restriction",
+          "suspended",
+          "blocked",
+          "abuse",
+          "appeal",
+          "self-serve",
+          "promo",
+          "eligibility",
+        ],
+        gist: "Confirmed abuse can restrict self-serve refunds or promo eligibility, and every restriction can be appealed once.",
+      },
+    ],
+  },
+  {
+    slug: "service-disruptions",
+    title: "Severe Weather & Service Disruptions",
+    category: "delivery",
+    version: "v1.2",
+    effective_date: "2026-06-18",
+    chunks: [
+      {
+        section: "When deliveries are paused",
+        text: "During heavy rain, flooding, or a city safety advisory, deliveries can be paused area by area. Estimates are extended, surge pricing may apply, and late-delivery credits are suspended for the duration of the advisory, because holding riders to a normal delivery time in those conditions is unsafe.",
+        keywords: [
+          "weather",
+          "rain",
+          "flood",
+          "storm",
+          "advisory",
+          "paused",
+          "disruption",
+          "surge",
+          "suspended",
+          "credit",
+        ],
+        gist: "During a weather or safety advisory, estimates stretch, surge may apply, and late-delivery credits are suspended.",
+      },
+      {
+        section: "If your order is caught in a disruption",
+        text: "An order already placed can be cancelled free of charge while a pause is active, even after the restaurant has confirmed it. Orders that cannot be delivered at all are refunded in full automatically within 2 hours, including fees, and you do not need to raise a claim.",
+        keywords: [
+          "weather",
+          "order",
+          "affected",
+          "cancel",
+          "free",
+          "refund",
+          "automatic",
+          "pause",
+        ],
+        gist: "While a service pause is active an order can be cancelled free of charge, and undeliverable orders are refunded in full automatically.",
+      },
+    ],
+  },
+];
+
+/* -----------------------------------------------------------------------------------------------
+ * Derived views
+ * ---------------------------------------------------------------------------------------------*/
+
+export interface KnowledgeChunk {
+  id: string;
+  document: SourceDocument;
+  text: string;
+  /** Mock retriever scoring hints. Not part of the API contract. */
+  keywords: string[];
+  /** Mock answer-composition sentence. Not part of the API contract. */
+  gist: string;
+  chunk_index: number;
+  token_count: number;
+}
+
+function documentId(slug: string): string {
+  return `doc_${slug}`;
+}
+
+function toSourceDocument(document: FixtureDocument, section: string): SourceDocument {
+  return {
+    id: documentId(document.slug),
+    title: document.title,
+    section,
+    category: document.category,
+    source_path: `policies/${document.slug}.md`,
+    version: document.version,
+    effective_date: document.effective_date,
+  };
+}
+
+/** Rough token estimate; good enough for a plausible prompt-token count. */
+export function estimateTokens(text: string): number {
+  return Math.max(1, Math.round(text.length / 4));
+}
+
+export const KNOWLEDGE_CHUNKS: readonly KnowledgeChunk[] = POLICY_DOCUMENTS.flatMap((document) =>
+  document.chunks.map((chunk, index) => ({
+    id: `chk_${document.slug}_${String(index + 1).padStart(2, "0")}`,
+    document: toSourceDocument(document, chunk.section),
+    text: chunk.text,
+    keywords: chunk.keywords,
+    gist: chunk.gist,
+    chunk_index: index,
+    token_count: estimateTokens(chunk.text),
+  })),
+);
+
+export const CHUNKS_BY_ID: ReadonlyMap<string, KnowledgeChunk> = new Map(
+  KNOWLEDGE_CHUNKS.map((chunk) => [chunk.id, chunk]),
+);
+
+export const DOCUMENT_TITLES: readonly string[] = POLICY_DOCUMENTS.map(
+  (document) => document.title,
+);
+
+/** Shape returned by GET /documents, so mock and live agree. */
+export const KNOWLEDGE_DOCUMENTS: readonly KnowledgeDocument[] = POLICY_DOCUMENTS.map(
+  (document) => ({
+    id: documentId(document.slug),
+    title: document.title,
+    section: null,
+    category: document.category,
+    source_path: `policies/${document.slug}.md`,
+    version: document.version,
+    effective_date: document.effective_date,
+    chunk_count: document.chunks.length,
+  }),
+);
+
+export function getChunk(id: string): KnowledgeChunk {
+  const chunk = CHUNKS_BY_ID.get(id);
+  if (!chunk) throw new Error(`Unknown fixture chunk id: ${id}`);
+  return chunk;
+}
