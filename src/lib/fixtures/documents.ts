@@ -1,15 +1,11 @@
 /**
- * The synthetic QuickBite knowledge base: 26 policy documents, 57 chunks.
+ * The synthetic QuickBite knowledge base: 26 support policy documents.
  *
- * Two fields exist only for the mock and are never part of the API contract:
- * - `keywords` feeds the mock retriever's scoring so distances behave like a real embedding index.
- * - `gist` is a self-contained sentence the mock uses to compose answers to unscripted questions.
- *
- * Policy numbers (windows, tiers, fees) are referenced by the scripted conversations, so changing a
- * number here means changing the matching answer text in ./conversations.ts.
+ * The mock API serves these as GET /policies and GET /policies/{id} (the slug is the id) and answers
+ * POST /chat questions from them. Two fields are mock-only and never sent over the API:
+ * - `keywords` feeds the mock keyword retriever.
+ * - `gist` is a self-contained sentence the mock uses as an answer bullet.
  */
-import type { KnowledgeDocument, SourceDocument } from "@/lib/api/schemas";
-
 export interface FixtureChunk {
   section: string;
   text: string;
@@ -103,6 +99,8 @@ export const POLICY_DOCUMENTS: readonly FixtureDocument[] = [
         keywords: [
           "refund",
           "delayed",
+          "late",
+          "slow",
           "not",
           "received",
           "missing",
@@ -583,6 +581,9 @@ export const POLICY_DOCUMENTS: readonly FixtureDocument[] = [
         keywords: [
           "failed",
           "attempt",
+          "rider",
+          "find",
+          "address",
           "unreachable",
           "call",
           "wait",
@@ -881,6 +882,7 @@ export const POLICY_DOCUMENTS: readonly FixtureDocument[] = [
           "scheduled",
           "advance",
           "later",
+          "tomorrow",
           "slot",
           "preorder",
           "3 days",
@@ -1131,79 +1133,6 @@ export const POLICY_DOCUMENTS: readonly FixtureDocument[] = [
   },
 ];
 
-/* -----------------------------------------------------------------------------------------------
- * Derived views
- * ---------------------------------------------------------------------------------------------*/
-
-export interface KnowledgeChunk {
-  id: string;
-  document: SourceDocument;
-  text: string;
-  /** Mock retriever scoring hints. Not part of the API contract. */
-  keywords: string[];
-  /** Mock answer-composition sentence. Not part of the API contract. */
-  gist: string;
-  chunk_index: number;
-  token_count: number;
-}
-
-function documentId(slug: string): string {
-  return `doc_${slug}`;
-}
-
-function toSourceDocument(document: FixtureDocument, section: string): SourceDocument {
-  return {
-    id: documentId(document.slug),
-    title: document.title,
-    section,
-    category: document.category,
-    source_path: `policies/${document.slug}.md`,
-    version: document.version,
-    effective_date: document.effective_date,
-  };
-}
-
-/** Rough token estimate; good enough for a plausible prompt-token count. */
-export function estimateTokens(text: string): number {
-  return Math.max(1, Math.round(text.length / 4));
-}
-
-export const KNOWLEDGE_CHUNKS: readonly KnowledgeChunk[] = POLICY_DOCUMENTS.flatMap((document) =>
-  document.chunks.map((chunk, index) => ({
-    id: `chk_${document.slug}_${String(index + 1).padStart(2, "0")}`,
-    document: toSourceDocument(document, chunk.section),
-    text: chunk.text,
-    keywords: chunk.keywords,
-    gist: chunk.gist,
-    chunk_index: index,
-    token_count: estimateTokens(chunk.text),
-  })),
+export const POLICIES_BY_ID: ReadonlyMap<string, FixtureDocument> = new Map(
+  POLICY_DOCUMENTS.map((document) => [document.slug, document]),
 );
-
-export const CHUNKS_BY_ID: ReadonlyMap<string, KnowledgeChunk> = new Map(
-  KNOWLEDGE_CHUNKS.map((chunk) => [chunk.id, chunk]),
-);
-
-export const DOCUMENT_TITLES: readonly string[] = POLICY_DOCUMENTS.map(
-  (document) => document.title,
-);
-
-/** Shape returned by GET /documents, so mock and live agree. */
-export const KNOWLEDGE_DOCUMENTS: readonly KnowledgeDocument[] = POLICY_DOCUMENTS.map(
-  (document) => ({
-    id: documentId(document.slug),
-    title: document.title,
-    section: null,
-    category: document.category,
-    source_path: `policies/${document.slug}.md`,
-    version: document.version,
-    effective_date: document.effective_date,
-    chunk_count: document.chunks.length,
-  }),
-);
-
-export function getChunk(id: string): KnowledgeChunk {
-  const chunk = CHUNKS_BY_ID.get(id);
-  if (!chunk) throw new Error(`Unknown fixture chunk id: ${id}`);
-  return chunk;
-}

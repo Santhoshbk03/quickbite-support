@@ -1,11 +1,11 @@
 /**
- * View-model helpers for an order record from `lookup_order`.
+ * View-model helpers for an order from the API.
  *
  * The backend passes the order service's record through as stored (timestamps, fees, driver), so the
  * timeline, lateness, and charge lines are derived here instead of being precomputed server-side.
  * Shared by the order card and by the mock's answer composition, so both tell the same story.
  */
-import type { LookupOrderResult } from "@/lib/api";
+import type { Order } from "@/lib/api/types";
 
 export type OrderTone = "neutral" | "brand" | "success" | "danger" | "info";
 
@@ -84,7 +84,7 @@ export interface OrderStage {
   tone: "default" | "danger";
 }
 
-export function orderStages(order: LookupOrderResult): OrderStage[] {
+export function orderStages(order: Order): OrderStage[] {
   const t = order.timestamps;
   const rider = order.driver ? firstName(order.driver.name) : null;
 
@@ -170,7 +170,7 @@ export interface OrderTiming {
   minutesSinceDelivery: number | null;
 }
 
-export function orderTiming(order: LookupOrderResult, reference: number): OrderTiming {
+export function orderTiming(order: Order, reference: number): OrderTiming {
   const t = order.timestamps;
   const promised = parseTime(t.eta_at_checkout);
   const delivered = parseTime(t.delivered_at);
@@ -209,7 +209,7 @@ const FEE_LABELS = [
   ["small_order_fee", "Small-order fee"],
 ] as const;
 
-export function orderCharges(order: LookupOrderResult): ChargeLine[] {
+export function orderCharges(order: Order): ChargeLine[] {
   const lines: ChargeLine[] = [];
   if (order.subtotal != null) lines.push({ label: "Subtotal", amount: order.subtotal });
   for (const [key, label] of FEE_LABELS) {
@@ -227,7 +227,7 @@ export function orderCharges(order: LookupOrderResult): ChargeLine[] {
   return lines;
 }
 
-export function lineTotal(item: LookupOrderResult["items"][number]): number {
+export function lineTotal(item: Order["items"][number]): number {
   return item.line_total ?? item.unit_price * item.quantity;
 }
 

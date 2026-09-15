@@ -1,15 +1,15 @@
 /**
- * Synthetic orders behind the `lookup_order` tool, in the order service's own record shape.
+ * Synthetic orders served by the mock API, in the order service's own record shape.
  *
  * Records are authored with absolute timestamps against a fixed anchor moment. "Live" orders are
  * shifted to the current time when looked up, so a demo opened at any hour still shows an order
  * 11 minutes away rather than a stale one. The last record is a real sample from the order service,
  * kept verbatim and unshifted.
  */
-import type { LookupOrderResult } from "@/lib/api/schemas";
+import type { Order } from "@/lib/api/types";
 
-/** A stored order record. PII fields exist in storage but are never part of the tool result. */
-export type OrderRecord = LookupOrderResult & {
+/** A stored order record. PII fields exist in storage but are never sent over the API. */
+export type OrderRecord = Order & {
   customer_email?: string | null;
   customer_id?: string | null;
 };
@@ -432,8 +432,8 @@ function shiftRecordTimes(
   );
 }
 
-/** Materialise a fixture into the tool result. Customer identifiers never leave this function. */
-export function buildLookupOrderResult(fixture: FixtureOrder, now: Date): LookupOrderResult {
+/** Materialise a fixture into the API response shape. Customer identifiers never leave this function. */
+export function toApiOrder(fixture: FixtureOrder, now: Date): Order {
   const source = fixture.record;
   const shiftMs = fixture.live ? now.getTime() - ANCHOR_MS : 0;
   const t = source.timestamps;

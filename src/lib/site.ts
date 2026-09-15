@@ -4,9 +4,9 @@
  */
 export const SITE = {
   name: "QuickBite Support",
-  title: "QuickBite Support — a support agent you can inspect",
+  title: "QuickBite Support",
   description:
-    "A retrieval-augmented customer support agent for a food delivery app. Every answer shows the policy chunks it retrieved, their distances, the tool calls it made, and where the milliseconds went.",
+    "A demo customer support app for a food delivery service: chat with a support assistant, track orders, and read the policies behind every answer.",
   repoUrl: "https://github.com/Santhoshbk03/quickbite-support",
 } as const;
 

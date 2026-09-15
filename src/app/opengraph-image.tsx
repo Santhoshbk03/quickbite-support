@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "QuickBite Support — answers from policy, or an honest no.";
+export const alt = "QuickBite Support: order help and policy answers, with sources.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -13,13 +13,7 @@ const FG = "#f5f1ea";
 const MUTED = "#cdc4b8";
 const SUBTLE = "#9d9387";
 const BRAND = "#eeab45";
-
-const ROWS = [
-  { title: "Late Delivery Compensation", distance: 0.238, state: "cited" },
-  { title: "Late Delivery · exemptions", distance: 0.327, state: "cited" },
-  { title: "Severe Weather & Disruptions", distance: 0.492, state: "unused" },
-  { title: "Rider Conduct & Safety", distance: 0.612, state: "below" },
-] as const;
+const DANGER = "#f08a70";
 
 export default function OpenGraphImage() {
   return new ImageResponse(
@@ -36,7 +30,7 @@ export default function OpenGraphImage() {
         fontFamily: "sans-serif",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", width: "58%", paddingRight: "40px" }}>
+      <div style={{ display: "flex", flexDirection: "column", width: "55%", paddingRight: "40px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div
             style={{
@@ -67,29 +61,28 @@ export default function OpenGraphImage() {
         <div
           style={{
             display: "flex",
-            marginTop: "56px",
+            marginTop: "64px",
             fontSize: "18px",
             letterSpacing: "3px",
             color: SUBTLE,
           }}
         >
-          RETRIEVAL-AUGMENTED SUPPORT AGENT
+          CUSTOMER SUPPORT DEMO
         </div>
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             marginTop: "18px",
-            fontSize: "68px",
-            lineHeight: 1.04,
+            fontSize: "66px",
+            lineHeight: 1.05,
             fontWeight: 600,
             letterSpacing: "-2px",
           }}
         >
-          <div style={{ display: "flex" }}>Answers from policy.</div>
+          <div style={{ display: "flex" }}>Order help and</div>
           <div style={{ display: "flex" }}>
-            <span style={{ color: SUBTLE }}>Or an honest&nbsp;</span>
-            <span style={{ color: BRAND }}>no.</span>
+            <span style={{ color: BRAND }}>policy answers.</span>
           </div>
         </div>
         <div
@@ -101,8 +94,7 @@ export default function OpenGraphImage() {
             color: MUTED,
           }}
         >
-          Every answer shows its sources, their distances, the tool calls, and where the
-          milliseconds went.
+          Chat with a support assistant, track orders, and read the policy behind every answer.
         </div>
       </div>
 
@@ -110,117 +102,78 @@ export default function OpenGraphImage() {
         style={{
           display: "flex",
           flexDirection: "column",
-          width: "42%",
+          width: "45%",
           alignSelf: "center",
           background: SURFACE,
           border: `1px solid ${LINE}`,
           borderRadius: "22px",
           padding: "28px",
+          gap: "20px",
           boxShadow: "0 30px 60px rgba(0,0,0,0.55)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "18px" }}>
-          <span style={{ color: FG, fontWeight: 600 }}>Retrieval</span>
-          <span style={{ color: SUBTLE }}>top-k 3 · cosine</span>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div
+            style={{
+              display: "flex",
+              background: SURFACE_3,
+              borderRadius: "16px",
+              padding: "12px 18px",
+              fontSize: "20px",
+            }}
+          >
+            Where is my order QB-2026-481213?
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "20px" }}>
+          <div style={{ display: "flex", color: FG }}>
+            On the way with Ravi, about 11 minutes away.
+          </div>
+          <div style={{ display: "flex", color: MUTED }}>• Promised at checkout: 7:25 PM</div>
         </div>
 
         <div
           style={{
             display: "flex",
-            position: "relative",
-            marginTop: "30px",
-            height: "10px",
-            borderRadius: "999px",
-            background: SURFACE_3,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              position: "absolute",
-              left: 0,
-              top: 0,
-              height: "10px",
-              width: "55%",
-              borderRadius: "999px",
-              background: "rgba(238,171,69,0.22)",
-            }}
-          />
-          <div
-            style={{
-              display: "flex",
-              position: "absolute",
-              left: "55%",
-              top: "-10px",
-              width: "2px",
-              height: "30px",
-              background: BRAND,
-            }}
-          />
-          {ROWS.map((row) => (
-            <div
-              key={row.title}
-              style={{
-                display: "flex",
-                position: "absolute",
-                left: `${row.distance * 100 - 1.4}%`,
-                top: "-3px",
-                width: "16px",
-                height: "16px",
-                borderRadius: "999px",
-                border: `3px solid ${row.state === "below" ? SUBTLE : BRAND}`,
-                background: row.state === "cited" ? BRAND : SURFACE,
-              }}
-            />
-          ))}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "30px" }}>
-          {ROWS.map((row) => (
-            <div
-              key={row.title}
-              style={{ display: "flex", alignItems: "center", fontSize: "18px" }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  width: "10px",
-                  height: "10px",
-                  borderRadius: "999px",
-                  marginRight: "12px",
-                  background:
-                    row.state === "cited" ? BRAND : row.state === "unused" ? MUTED : SURFACE_3,
-                }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  flexGrow: 1,
-                  color: row.state === "below" ? SUBTLE : MUTED,
-                }}
-              >
-                {row.title}
-              </div>
-              <div style={{ display: "flex", color: row.state === "below" ? SUBTLE : FG }}>
-                {row.distance.toFixed(3)}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            marginTop: "24px",
-            paddingTop: "18px",
-            borderTop: `1px solid ${LINE}`,
-            fontSize: "16px",
-            color: SUBTLE,
+            alignItems: "center",
             justifyContent: "space-between",
+            border: `1px solid ${LINE}`,
+            borderRadius: "14px",
+            padding: "14px 18px",
+            fontSize: "18px",
           }}
         >
-          <span>threshold ≤ 0.55</span>
-          <span style={{ color: BRAND }}>2 cited · 1 unused · 1 below</span>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ color: FG, fontWeight: 600 }}>Dosa Republic</span>
+            <span style={{ color: SUBTLE }}>3 items · ₹586</span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              color: DANGER,
+              border: `1px solid ${DANGER}`,
+              borderRadius: "999px",
+              padding: "4px 12px",
+            }}
+          >
+            28 min late
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "16px" }}>
+          <span style={{ color: SUBTLE, letterSpacing: "2px" }}>SOURCES</span>
+          <span
+            style={{
+              display: "flex",
+              color: BRAND,
+              border: `1px solid ${LINE}`,
+              borderRadius: "999px",
+              padding: "4px 12px",
+            }}
+          >
+            Late Delivery Compensation
+          </span>
         </div>
       </div>
     </div>,

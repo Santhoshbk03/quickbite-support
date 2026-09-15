@@ -11,11 +11,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "contract:export": "node --import ./scripts/register-loader.mjs scripts/contract.ts export",
-    "contract:check": "node --import ./scripts/register-loader.mjs scripts/contract.ts check",
-    "contract:verify": "node --import ./scripts/register-loader.mjs scripts/contract.ts verify",
-    "contract:serve": "node --import ./scripts/register-loader.mjs scripts/contract.ts serve",
-    "verify": "tsc --noEmit && eslint && node --import ./scripts/register-loader.mjs scripts/contract.ts check && node --import ./scripts/register-loader.mjs scripts/contract.ts verify"
+    "verify": "tsc --noEmit && eslint && prettier --check ."
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

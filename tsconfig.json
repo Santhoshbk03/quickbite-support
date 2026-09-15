@@ -11,8 +11,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    // `import type` must be explicit and TS-only runtime syntax is banned, so scripts/ can run the
-    // same source directly under Node's type stripping — no bundler, no test runner.
+    // `import type` must be explicit, and TS-only runtime syntax (enums, parameter properties) is off.
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "jsx": "react-jsx",

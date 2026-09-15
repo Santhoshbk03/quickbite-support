@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 
+import { FallbackBanner } from "@/components/site/fallback-banner";
+import { Providers } from "@/components/site/providers";
+import { SiteHeader } from "@/components/site/site-header";
 import { resolveSiteUrl, SITE } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme-script";
 
 import "./globals.css";
 
-/** Display: an editorial serif with optical sizing and a soft axis — warm, not corporate. */
+/** Display: an editorial serif with optical sizing and a soft axis. */
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-fraunces",
@@ -14,14 +17,13 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-/** Body: a readable grotesque with a slightly narrower set than Inter. */
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
   variable: "--font-instrument",
   display: "swap",
 });
 
-/** Numbers and identifiers: tabular figures for distances, milliseconds, and order IDs. */
+/** Order IDs and amounts: tabular figures. */
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
@@ -69,7 +71,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Applies the remembered theme before first paint; no flash on reload. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-dvh bg-canvas font-sans text-fg antialiased">{children}</body>
+      <body className="bg-canvas font-sans text-fg antialiased">
+        <Providers>
+          <div className="flex h-dvh flex-col">
+            <a
+              href="#content"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-sm focus:bg-surface-3 focus:px-3 focus:py-2 focus:text-sm focus:text-fg"
+            >
+              Skip to content
+            </a>
+            <SiteHeader />
+            <FallbackBanner />
+            <div id="content" className="min-h-0 flex-1">
+              {children}
+            </div>
+          </div>
+        </Providers>
+      </body>
     </html>
   );
 }

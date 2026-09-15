@@ -4,7 +4,7 @@ import { LogoMark } from "@/components/brand/logo";
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
+    <main className="flex h-full items-center justify-center overflow-y-auto bg-canvas px-6 py-10">
       <div className="max-w-md text-center">
         <LogoMark className="mx-auto size-10" />
         <p className="mt-6 font-mono text-xs text-fg-subtle">404</p>
