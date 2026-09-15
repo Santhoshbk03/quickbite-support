@@ -141,13 +141,13 @@ function buildScenarios(): Scenario[] {
     },
     {
       name: "improvised/order lookup",
-      question: "Can you check on QB-50342?",
+      question: "Can you check on QB-2026-503420?",
       history: [],
       expect: ["answer", "tool_call"],
     },
     {
       name: "improvised/unknown order",
-      question: "Where is my order QB-00000?",
+      question: "Where is my order QB-2026-000000?",
       history: [],
       expect: ["answer", "tool_error"],
     },
@@ -161,15 +161,15 @@ function buildScenarios(): Scenario[] {
       name: "improvised/contextual follow-up",
       question: "Is it going to be late?",
       history: [
-        { role: "user", content: "Can you check on QB-48213?" },
+        { role: "user", content: "Can you check on QB-2026-481213?" },
         {
           role: "assistant",
           content: "Your order is on the way.",
           tool_calls: [
             {
               name: "lookup_order",
-              arguments: { order_id: "QB-48213" },
-              result: { order_id: "QB-48213" },
+              arguments: { order_id: "QB-2026-481213" },
+              result: { order_id: "QB-2026-481213" },
             },
           ],
         },
@@ -545,7 +545,10 @@ function startReferenceServer(options: {
         });
 
         const controller = new AbortController();
-        request.on("close", () => controller.abort());
+        // IncomingMessage "close" fires once the body is read; only an unfinished response means the client left.
+        response.on("close", () => {
+          if (!response.writableFinished) controller.abort();
+        });
 
         void (async () => {
           let sequence = 0;
@@ -716,7 +719,12 @@ async function commandCheckLive(baseUrl: string): Promise<number> {
       history: [],
       expect: ["answer"],
     },
-    { name: "live/order lookup", question: "Where is my order QB-48213?", history: [], expect: [] },
+    {
+      name: "live/order lookup",
+      question: "Where is my order QB-2026-481213?",
+      history: [],
+      expect: [],
+    },
     {
       name: "live/out of scope",
       question: "What is the capital of France?",

@@ -14,13 +14,14 @@ import {
   buildLookupOrderResult,
   estimateTokens,
   findOrder,
-  formatRupees,
   getChunk,
   matchScriptedTurn,
   normalizeOrderId,
   KNOWLEDGE_CHUNKS,
 } from "@/lib/fixtures";
 import type { KnowledgeChunk, ScriptedTurnMatch } from "@/lib/fixtures";
+import { formatAmount } from "@/lib/format";
+import { firstName, orderStatusMeta, orderTiming, readNumber, readString } from "@/lib/order-view";
 import { isLookupOrderCall } from "../schemas";
 import type {
   ChatRequest,
@@ -157,7 +158,7 @@ function planScripted(match: ScriptedTurnMatch, context: PlanContext): ResponseP
 
 const GREETING_RE = /^(hi|hey|hello|yo|namaste|good (morning|afternoon|evening))\b/i;
 const THANKS_RE = /^(thanks|thank you|thanks a lot|cheers|ty)\b/i;
-const ORDER_ID_RE = /\b#?\s?(QB[\s-]?\d{5})\b/i;
+const ORDER_ID_RE = /\b#?\s?(QB[\s-]?\d{4}[\s-]?\d{6})\b/i;
 const REFERENTIAL_RE = /\b(it|its|it's|that|this|the order|my order|the delay|same order|them)\b/i;
 const ORDER_INTENT_RE =
   /\b(where|status|track|tracking|eta|how long|late|arriv\w*|coming|stuck|delay\w*|cancel\w*|refund\w*|missing|wrong|cold|charged)\b/i;
@@ -202,10 +203,11 @@ function planImprovised(
   let preamble = "";
 
   if (contextOrderId) {
+    const displayId = normalizeOrderId(contextOrderId) ?? contextOrderId.toUpperCase();
     preamble = rng.pick([
-      `Let me pull up order **${normalizeOrderId(contextOrderId) ?? contextOrderId}**.`,
-      `Checking order **${normalizeOrderId(contextOrderId) ?? contextOrderId}** now.`,
-      `One moment — looking up **${normalizeOrderId(contextOrderId) ?? contextOrderId}**.`,
+      `Let me pull up order **${displayId}**.`,
+      `Checking order **${displayId}** now.`,
+      `One moment — looking up **${displayId}**.`,
     ]);
     const call = buildLookupOrderCall({
       id: "tc_1",
@@ -278,7 +280,7 @@ function planSmallTalk(question: string, context: PlanContext): ResponsePlan {
   const { rng, profile } = context;
   const content = THANKS_RE.test(question)
     ? "Happy to help. Anything else about an order or a policy?"
-    : "Hi. I can explain QuickBite's policies — refunds, late deliveries, cancellations, allergens — and look up an order if you share its ID, like QB-48213.";
+    : "Hi. I can explain QuickBite's policies — refunds, late deliveries, cancellations, allergens — and look up an order if you share its ID, like QB-2026-481213.";
 
   const ttft = rng.range(profile.ttft);
   const completionTokens = estimateTokens(content);
@@ -365,7 +367,7 @@ function estimatePromptTokens(
     contextTokens +
     historyTokens +
     estimateTokens(request.message.content) +
-    (hasToolResult ? 210 : 0)
+    (hasToolResult ? 260 : 0)
   );
 }
 
@@ -560,7 +562,7 @@ function buildLookupOrderCall(args: {
   return {
     id,
     name: "lookup_order",
-    arguments: { order_id: order.order_id },
+    arguments: { order_id: order.record.order_id },
     status: "success",
     result: buildLookupOrderResult(order, now),
     error: null,
@@ -570,7 +572,7 @@ function buildLookupOrderCall(args: {
 }
 
 /* -----------------------------------------------------------------------------------------------
- * Answer composition
+ * Answer composition: plain text and bullet points, like the real backend
  * ---------------------------------------------------------------------------------------------*/
 
 const LEAD_BY_CATEGORY: Record<string, string> = {
@@ -605,90 +607,88 @@ function selectCited(passed: SourceChunk[]): SourceChunk[] {
   return cited;
 }
 
+function citedBullets(passed: SourceChunk[]): string {
+  return selectCited(passed)
+    .map((chunk) => `- ${getChunk(chunk.id).gist} [${chunk.rank}]`)
+    .join("\n");
+}
+
 function composePolicyAnswer(passed: SourceChunk[]): string {
-  const cited = selectCited(passed);
-  const category = cited[0].document.category ?? "";
+  const category = passed[0]?.document.category ?? "";
   const lead = LEAD_BY_CATEGORY[category] ?? "Here's what the policy says:";
-  const bullets = cited.map((chunk) => `- ${getChunk(chunk.id).gist} [${chunk.rank}]`).join("\n");
   const closer = CLOSER_BY_CATEGORY[category] ?? "";
+  const bullets = citedBullets(passed);
   return closer ? `${lead}\n\n${bullets}\n\n${closer}` : `${lead}\n\n${bullets}`;
 }
 
 function composeAskForOrderId(passed: SourceChunk[]): string {
-  const cited = selectCited(passed).slice(0, 1);
-  const bullets = cited.map((chunk) => `- ${getChunk(chunk.id).gist} [${chunk.rank}]`).join("\n");
-  return `I can check that for you — what's the order ID? It looks like **QB-48213** and sits at the top of the order's page in the app.\n\n${bullets}`;
+  const bullets = citedBullets(passed.slice(0, 1));
+  return `I can check that for you. What's the order ID? It looks like **QB-2026-481213** and sits at the top of the order's page in the app.\n\n${bullets}`;
 }
 
 function composeLookupFailure(rawOrderId: string): string {
-  return `I couldn't find an order with the ID **${rawOrderId.toUpperCase()}**. QuickBite order IDs look like **QB-48213** — you'll find the exact one at the top of the order's page in the app. Send it across and I'll take another look.`;
+  return `I couldn't find an order with the ID **${rawOrderId.toUpperCase()}**. QuickBite order IDs look like **QB-2026-481213**, and you'll find the exact one at the top of the order's page in the app. Send it across and I'll take another look.`;
 }
 
 function composeOrderAnswer(order: LookupOrderResult, passed: SourceChunk[], now: Date): string {
   const restaurant = `**${order.restaurant.name}**`;
-  const minutesRemaining = order.eta?.minutes_remaining ?? null;
+  const timing = orderTiming(order, now.getTime());
+  const rider = order.driver ? firstName(order.driver.name) : null;
   const lines: string[] = [];
 
   switch (order.status) {
-    case "out_for_delivery": {
-      const rider = order.rider ? ` with ${order.rider.first_name}` : "";
+    case "picked_up":
+    case "out_for_delivery":
       lines.push(
-        `Your order from ${restaurant} is **out for delivery**${rider}${
-          minutesRemaining ? ` and should reach you in about **${minutesRemaining} minutes**` : ""
+        `Your order from ${restaurant} is on its way${rider ? ` with ${rider}` : ""}${
+          timing.minutesRemaining ? `, about **${timing.minutesRemaining} minutes** away` : ""
         }.`,
       );
       break;
-    }
-    case "preparing":
+    case "delivered":
       lines.push(
-        `${restaurant} is still preparing your order${
-          minutesRemaining
-            ? `, with the live estimate about **${minutesRemaining} minutes** out`
+        `That order from ${restaurant} was delivered${
+          timing.minutesSinceDelivery !== null && timing.minutesSinceDelivery < 180
+            ? ` ${timing.minutesSinceDelivery} minutes ago`
             : ""
+        }, and the total was **${formatAmount(order.total)}**.`,
+      );
+      break;
+    case "cancelled": {
+      const by = readString(order.cancellation, "cancelled_by");
+      const reason = readString(order.cancellation, "reason");
+      lines.push(
+        `That order from ${restaurant} was cancelled${by ? ` by the ${by === "quickbite" ? "platform" : by}` : ""}${
+          reason ? `: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}` : ""
         }.`,
       );
-      break;
-    case "confirmed":
-    case "placed":
-      lines.push(
-        `${restaurant} has your order${
-          minutesRemaining ? ` and the estimate is about **${minutesRemaining} minutes**` : ""
-        }. It hasn't gone to the kitchen queue long enough to show progress yet.`,
-      );
-      break;
-    case "delivered": {
-      const minutesAgo = order.delivered_at
-        ? Math.max(1, Math.round((now.getTime() - Date.parse(order.delivered_at)) / 60_000))
-        : null;
-      lines.push(
-        `That order from ${restaurant} was delivered${minutesAgo ? ` ${minutesAgo} minutes ago` : ""}, and the total was **${formatRupees(order.totals.total.amount_minor)}**.`,
-      );
-      break;
-    }
-    case "cancelled": {
-      const by = order.cancellation?.by;
-      const reason = order.cancellation?.reason;
-      lines.push(
-        `That order from ${restaurant} was cancelled${by ? ` by the ${by === "quickbite" ? "platform" : by}` : ""}${reason ? ` — ${reason.toLowerCase()}` : ""}.`,
-      );
-      if (order.refund) {
+      const refundAmount = readNumber(order.refund, "amount");
+      if (refundAmount !== null) {
         lines.push(
-          `The refund of **${formatRupees(order.refund.amount.amount_minor)}** is ${order.refund.status} to ${order.refund.method}.`,
+          `A refund of **${formatAmount(refundAmount)}** is ${readString(order.refund, "status") ?? "being processed"}.`,
         );
       }
       break;
     }
+    default:
+      lines.push(
+        `${restaurant} has your order, and it is ${orderStatusMeta(order.status).label.toLowerCase()}${
+          timing.minutesRemaining
+            ? `. The latest estimate is about **${timing.minutesRemaining} minutes**`
+            : ""
+        }.`,
+      );
   }
 
-  if (order.eta?.is_late && order.eta.minutes_late) {
+  if (timing.isLate && timing.minutesVsPromise) {
     lines.push(
-      `It is running **${order.eta.minutes_late} minutes** behind the time promised at checkout.`,
+      order.status === "delivered"
+        ? `It arrived **${timing.minutesVsPromise} minutes** after the time promised at checkout.`
+        : `It is running **${timing.minutesVsPromise} minutes** behind the time promised at checkout.`,
     );
   }
 
-  const cited = selectCited(passed);
-  const bullets = cited.map((chunk) => `- ${getChunk(chunk.id).gist} [${chunk.rank}]`).join("\n");
-
+  const bullets = citedBullets(passed);
   return bullets ? `${lines.join(" ")}\n\n${bullets}` : lines.join(" ");
 }
 
@@ -704,7 +704,7 @@ const SUGGESTION_BY_DOCUMENT: Record<string, string> = {
   "doc_cancellations-customer": "Can I cancel after the restaurant confirms?",
   "doc_cancellations-restaurant": "What happens when a restaurant cancels my order?",
   doc_allergens: "Where does allergen information on the menu come from?",
-  "doc_food-safety": "I found something in my food — how do I report it?",
+  "doc_food-safety": "I found something in my food. How do I report it?",
   "doc_food-quality": "My food arrived cold. What can I claim?",
   "doc_rider-conduct": "What conduct standards do QuickBite riders follow?",
   doc_tipping: "How does tipping my delivery partner work?",

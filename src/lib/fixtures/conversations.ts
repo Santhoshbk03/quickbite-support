@@ -5,9 +5,10 @@
  * replay when a live backend is unreachable, and the contract check suite. The mock turns each turn
  * into a real event stream, so scripted and improvised answers travel the exact same path.
  *
- * Distances are hand-set to plausible cosine values (see docs/API_CONTRACT.md §14 for the
- * placeholders). `preamble` is the text streamed *before* a tool call, which is how the contract's
- * `content_offset` gets derived instead of hand-counted.
+ * Answers are plain text and bullet points, matching what the real backend returns today. Distances
+ * are hand-set to plausible cosine values. `preamble` is the text streamed *before* a tool call,
+ * which is how the contract's `content_offset` is derived instead of hand-counted. Order facts in
+ * the text (minutes late, fees, totals) must agree with ./orders.ts.
  */
 export type Capability = "policy" | "refund" | "tool_use" | "multi_turn" | "refusal";
 
@@ -67,11 +68,9 @@ export const SCRIPTED_CONVERSATIONS: readonly ScriptedConversation[] = [
         user: "What happens if my delivery is late?",
         content: `QuickBite measures lateness against the delivery time you were promised at checkout, and the credit is applied automatically [1].
 
-| How late | What you get |
-| --- | --- |
-| 10–20 min | ₹40 Wallet credit |
-| 21–40 min | Delivery fee refunded + ₹75 credit |
-| Over 40 min | 50% of the food subtotal as credit, capped at ₹300 |
+- **10 to 20 minutes late:** a ₹40 Wallet credit.
+- **21 to 40 minutes late:** the delivery fee is refunded, plus a ₹75 credit.
+- **More than 40 minutes late:** 50% of the food subtotal as credit, capped at ₹300.
 
 A few details worth knowing:
 
@@ -86,7 +85,7 @@ If a specific order arrived late, share the order ID and I can tell you which ti
           { id: "chk_service-disruptions_01", distance: 0.492 },
         ],
         timings: { embedding: 31.6, retrieval: 14.2, filtering: 1.3, ttft: 402, generation: 1980 },
-        usage: { prompt_tokens: 1284, completion_tokens: 248 },
+        usage: { prompt_tokens: 1284, completion_tokens: 236 },
       },
     ],
   },
@@ -97,27 +96,27 @@ If a specific order arrived late, share the order ID and I can tell you which ti
     summary: "Tool lookup plus three policy chunks to resolve two separate claims on one order.",
     turns: [
       {
-        user: "My order QB-51877 came without the garlic naan and the paneer was lukewarm. Can I get a refund?",
-        preamble: "Let me pull up order **QB-51877** first.",
+        user: "My order QB-2026-518772 came without the garlic naan and the paneer was lukewarm. Can I get a refund?",
+        preamble: "Let me pull up order **QB-2026-518772** first.",
         content: `
 
 That order from **Tandoor Theory** was delivered 22 minutes ago, and it did include **2 × Garlic Naan (₹130)**.
 
 Here is where you stand on each issue:
 
-- **Missing garlic naan** — missing items are refunded at full item value when reported within 2 hours of delivery, so that is **₹130** back, and no photo is needed [1].
-- **Lukewarm paneer** — temperature complaints are assessed case by case with a photo attached within 2 hours. A verified complaint is compensated up to 50% of the item value, so up to **₹144.50** on the ₹289 Paneer Butter Masala [2].
-- **How the money comes back** — a Wallet credit is instant, or it returns to the card ending 4242 in 5 to 7 business days [3].
+- **Missing garlic naan:** missing items are refunded at full item value when reported within 2 hours of delivery, so that is **₹130** back, and no photo is needed [1].
+- **Lukewarm paneer:** temperature complaints are assessed case by case with a photo attached within 2 hours. A verified complaint is compensated up to 50% of the item value, so up to **₹144.50** on the ₹289 Paneer Butter Masala [2].
+- **How the money comes back:** a Wallet credit is instant, or it returns to the card you paid with in 5 to 7 business days [3].
 
-You are inside the 2-hour window on both counts. Raise them from **Order QB-51877 → Report an issue** and attach one photo of the paneer.`,
+You are inside the 2-hour window on both counts. Raise them from **Order QB-2026-518772 → Report an issue** and attach one photo of the paneer.`,
         chunks: [
           { id: "chk_missing-items_01", distance: 0.221 },
           { id: "chk_food-quality_01", distance: 0.284 },
           { id: "chk_refund-timelines_01", distance: 0.386 },
         ],
-        tool_call: { order_id: "QB-51877", duration_ms: 486 },
+        tool_call: { order_id: "QB-2026-518772", duration_ms: 486 },
         timings: { embedding: 29.8, retrieval: 16.1, filtering: 1.1, ttft: 338, generation: 2740 },
-        usage: { prompt_tokens: 1893, completion_tokens: 331 },
+        usage: { prompt_tokens: 1893, completion_tokens: 318 },
       },
     ],
   },
@@ -129,17 +128,17 @@ You are inside the 2-hour window on both counts. Raise them from **Order QB-5187
       "Order lookup on a restaurant-cancelled order, with the automatic refund path explained.",
     turns: [
       {
-        user: "What happened to my order QB-49920? The app just says cancelled.",
-        preamble: "Checking order **QB-49920** now.",
+        user: "What happened to my order QB-2026-499203? The app just says cancelled.",
+        preamble: "Checking order **QB-2026-499203** now.",
         content: `
 
 **Green Fork Salads** cancelled it 12 minutes after you ordered, because the **Quinoa Power Bowl** was out of stock.
 
-Since the restaurant cancelled, everything is handled automatically [1]:
+Since the restaurant cancelled, everything is handled for you:
 
-- The full **₹815** is refunded, including the delivery and platform fees.
-- A **₹50** apology credit has been added to your QuickBite Wallet.
-- The refund is already initiated to **UPI**, which usually lands within 2 to 4 business days [2].
+- The full **₹835** is being refunded, including the delivery, packaging, and platform fees.
+- A **₹50** apology credit is added to your QuickBite Wallet as well [1].
+- The refund has already been initiated to your UPI account, and UPI refunds usually land within 2 to 4 business days [2].
 
 There is no claim to raise. If it has not arrived by then, quote the refund reference on the order page and support can trace it with the processor [2].`,
         chunks: [
@@ -147,9 +146,9 @@ There is no claim to raise. If it has not arrived by then, quote the refund refe
           { id: "chk_refund-timelines_01", distance: 0.371 },
           { id: "chk_refunds-and-credits_01", distance: 0.528 },
         ],
-        tool_call: { order_id: "QB-49920", duration_ms: 442 },
+        tool_call: { order_id: "QB-2026-499203", duration_ms: 442 },
         timings: { embedding: 30.4, retrieval: 13.9, filtering: 1.2, ttft: 361, generation: 2410 },
-        usage: { prompt_tokens: 1747, completion_tokens: 268 },
+        usage: { prompt_tokens: 1747, completion_tokens: 262 },
       },
     ],
   },
@@ -161,49 +160,52 @@ There is no claim to raise. If it has not arrived by then, quote the refund refe
       "Three turns where each follow-up is rewritten into a standalone query, ending on an Ollama fallback.",
     turns: [
       {
-        user: "Where's my order QB-48213? It's been almost an hour.",
-        preamble: "Let me pull up order **QB-48213**.",
+        user: "Where's my order QB-2026-481213? It's been almost an hour.",
+        preamble: "Let me pull up order **QB-2026-481213**.",
         content: `
 
-Your order from **Dosa Republic** is **out for delivery** — Ravi picked it up 9 minutes ago and the live estimate puts it about **11 minutes** away [1].
+Your order from **Dosa Republic** is on its way. Ravi picked it up 9 minutes ago, and the latest estimate puts it about **11 minutes** away [1].
 
-It is running behind. Checkout promised delivery **28 minutes** earlier than the current estimate, mostly because the kitchen ran late on a large order.`,
+It is running behind: that estimate is **28 minutes** later than the time promised at checkout, mostly because the kitchen took longer than usual to get it ready.`,
         chunks: [
           { id: "chk_delivery-tracking_01", distance: 0.312 },
           { id: "chk_late-delivery-compensation_01", distance: 0.447 },
           { id: "chk_failed-delivery_01", distance: 0.583 },
         ],
-        tool_call: { order_id: "QB-48213", duration_ms: 412.6 },
+        tool_call: { order_id: "QB-2026-481213", duration_ms: 412.6 },
         timings: { embedding: 31.1, retrieval: 14.8, filtering: 1.4, ttft: 344, generation: 2180 },
-        usage: { prompt_tokens: 1486, completion_tokens: 142 },
+        usage: { prompt_tokens: 1486, completion_tokens: 139 },
       },
       {
         user: "Do I get anything for the delay?",
         standalone_query:
-          "What compensation applies when an order is delivered 28 minutes later than the time promised at checkout?",
-        content: `Yes. At **28 minutes** late, QB-48213 sits in the 21–40 minute tier: the **₹35 delivery fee is refunded** and a **₹75 Wallet credit** is added [1].
+          "What compensation applies when order QB-2026-481213 arrives 28 minutes later than the time promised at checkout?",
+        content: `Yes. At **28 minutes** late, QB-2026-481213 sits in the 21 to 40 minute tier: the **₹35 delivery fee is refunded** and a **₹75 Wallet credit** is added [1].
 
 Two things worth knowing:
 
 - It is applied automatically within 2 hours of delivery, so there is nothing to claim [1].
 - If it slips past **40 minutes** late and still has not been handed to you, you can cancel from the order page for a full refund instead [3].
 
-The usual exemptions — an active weather advisory, an address change after checkout, or the rider being unable to reach you for more than 10 minutes — do not apply to this order [2].`,
+The usual exemptions do not apply here: there is no weather advisory, the address was not changed after checkout, and the rider has not reported trouble reaching you [2].`,
         chunks: [
           { id: "chk_late-delivery-compensation_01", distance: 0.196 },
           { id: "chk_late-delivery-compensation_02", distance: 0.341 },
           { id: "chk_late-delivery-compensation_03", distance: 0.404 },
         ],
         timings: { embedding: 28.9, retrieval: 12.6, filtering: 1.0, ttft: 298, generation: 1870 },
-        usage: { prompt_tokens: 1655, completion_tokens: 197 },
+        usage: { prompt_tokens: 1655, completion_tokens: 193 },
       },
       {
         user: "Can I just cancel it instead?",
         standalone_query:
           "Can a customer cancel an order that has already been picked up by a rider and is running late?",
-        content: `Not at this point. QB-48213 has already been picked up, and once a rider has collected an order it can no longer be cancelled [1].
+        content: `Not at this point. QB-2026-481213 has already been picked up, and once a rider has collected an order it can no longer be cancelled [1].
 
-The exception is the 40-minute mark. If an order is more than **40 minutes** late and has not been handed to you, cancelling becomes free and refunds in full including fees [2][3]. At 28 minutes late you are not there yet, so the app will not offer a cancel button on this order [1].
+The exception is the 40-minute mark:
+
+- If an order is more than **40 minutes** late and has not been handed to you, cancelling becomes free and refunds in full, fees included [2][3].
+- At 28 minutes late you are not there yet, so the app will not offer a cancel button on this order [1].
 
 If it does cross 40 minutes before Ravi arrives, the option appears on the order page on its own.`,
         chunks: [
@@ -219,7 +221,7 @@ If it does cross 40 minutes before Ravi arrives, the option appears on the order
           fallback_reason: "groq: 429 rate_limit_exceeded (daily token quota)",
         },
         timings: { embedding: 30.2, retrieval: 13.1, filtering: 1.1, ttft: 1180, generation: 5240 },
-        usage: { prompt_tokens: 1721, completion_tokens: 186 },
+        usage: { prompt_tokens: 1721, completion_tokens: 181 },
       },
     ],
   },
@@ -258,7 +260,7 @@ export const CONVERSATIONS_BY_ID: ReadonlyMap<string, ScriptedConversation> = ne
   SCRIPTED_CONVERSATIONS.map((conversation) => [conversation.id, conversation]),
 );
 
-/** Normalised user text -> the scripted turn, for matching what someone actually types. */
+/** Normalised user text, for matching what someone actually types against the scripts. */
 export function normalizeQuestion(text: string): string {
   return text
     .toLowerCase()

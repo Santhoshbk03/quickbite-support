@@ -303,19 +303,20 @@ export function checkEventSequence(events: ChatStreamEvent[]): ConformanceIssue[
             );
           }
           if (isLookupOrderCall(call) && call.status === "success" && call.result) {
-            const current = call.result.timeline.filter((entry) => entry.state === "current");
-            if (current.length !== 1) {
+            const order = call.result;
+            if (order.status === "delivered" && !order.timestamps.delivered_at) {
               add(
                 "warning",
-                "tool.timeline_current",
-                `lookup_order(${call.result.order_id}): ${current.length} timeline entries marked current, expected exactly 1.`,
+                "tool.delivered_without_time",
+                `lookup_order(${order.order_id}) is delivered but has no timestamps.delivered_at, so the card cannot show when.`,
                 index,
               );
-            } else if (current[0].status !== call.result.status) {
+            }
+            if (order.status === "cancelled" && !order.cancellation) {
               add(
                 "warning",
-                "tool.timeline_status",
-                `lookup_order(${call.result.order_id}): current timeline entry is "${current[0].status}" but status is "${call.result.status}".`,
+                "tool.cancelled_without_details",
+                `lookup_order(${order.order_id}) is cancelled but carries no cancellation details.`,
                 index,
               );
             }

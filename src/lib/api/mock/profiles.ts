@@ -112,7 +112,14 @@ export const TIMING_PROFILES: Record<MockProfile, TimingProfile> = {
 };
 
 export function sleepFor(ms: number, signal?: AbortSignal): Promise<void> {
-  if (ms <= 0) return Promise.resolve();
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException("The operation was aborted.", "AbortError"));
+  }
+  // Browsers clamp timers in hidden tabs to a second or more, so pacing a stream nobody is watching
+  // would make it arrive minutes late. Skip the wait; reported latencies are planned values anyway.
+  if (ms <= 0 || (typeof document !== "undefined" && document.visibilityState === "hidden")) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);

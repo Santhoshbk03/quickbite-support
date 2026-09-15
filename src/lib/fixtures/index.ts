@@ -14,13 +14,9 @@ export {
   ORDERS_BY_ID,
   buildLookupOrderResult,
   findOrder,
-  formatRupees,
-  itemTotalMinor,
-  money,
   normalizeOrderId,
-  subtotalMinor,
 } from "./orders";
-export type { FixtureOrder, FixtureOrderItem, FixtureTimelineStep } from "./orders";
+export type { FixtureOrder, OrderRecord } from "./orders";
 
 export {
   CONVERSATIONS_BY_ID,

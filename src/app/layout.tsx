@@ -1,28 +1,75 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+
+import { resolveSiteUrl, SITE } from "@/lib/site";
+import { themeInitScript } from "@/lib/theme-script";
+
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/** Display: an editorial serif with optical sizing and a soft axis — warm, not corporate. */
+const fraunces = Fraunces({
   subsets: ["latin"],
+  variable: "--font-fraunces",
+  axes: ["SOFT", "WONK", "opsz"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+/** Body: a readable grotesque with a slightly narrower set than Inter. */
+const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
+  variable: "--font-instrument",
+  display: "swap",
+});
+
+/** Numbers and identifiers: tabular figures for distances, milliseconds, and order IDs. */
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "QuickBite Support",
-  description: "A retrieval-augmented support agent for a food delivery app.",
+  metadataBase: new URL(resolveSiteUrl()),
+  title: { default: SITE.title, template: `%s · ${SITE.name}` },
+  description: SITE.description,
+  applicationName: SITE.name,
+  openGraph: {
+    type: "website",
+    siteName: SITE.name,
+    title: SITE.title,
+    description: SITE.description,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE.title,
+    description: SITE.description,
+  },
 };
 
-// Typed explicitly rather than with Next's generated `LayoutProps<"/">`, so `tsc --noEmit` passes on
-// a clean checkout before any build has generated .next/types. Phase 1 replaces this file.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#1b1815" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f2ec" },
+  ],
+  colorScheme: "dark light",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html
+      lang="en"
+      className={`dark ${fraunces.variable} ${instrumentSans.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        {/* Applies the remembered theme before first paint; no flash on reload. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="min-h-dvh bg-canvas font-sans text-fg antialiased">{children}</body>
     </html>
   );
 }

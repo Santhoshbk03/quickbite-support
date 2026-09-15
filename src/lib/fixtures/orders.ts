@@ -1,265 +1,402 @@
 /**
- * Synthetic orders behind the `lookup_order` tool.
+ * Synthetic orders behind the `lookup_order` tool, in the order service's own record shape.
  *
- * Timestamps are stored as offsets from "now" and materialised at call time, so a demo opened at
- * any hour shows a plausible live order rather than a stale one. Money is in paise; totals are
- * computed, never hand-typed, so the order card always adds up.
+ * Records are authored with absolute timestamps against a fixed anchor moment. "Live" orders are
+ * shifted to the current time when looked up, so a demo opened at any hour still shows an order
+ * 11 minutes away rather than a stale one. The last record is a real sample from the order service,
+ * kept verbatim and unshifted.
  */
-import type { LookupOrderResult, Money, OrderStatus, OrderTimelineEvent } from "@/lib/api/schemas";
+import type { LookupOrderResult } from "@/lib/api/schemas";
 
-export interface FixtureOrderItem {
-  name: string;
-  quantity: number;
-  unit_price_minor: number;
-  modifiers?: string[];
-}
-
-export interface FixtureTimelineStep {
-  status: OrderStatus;
-  label: string;
-  /** Minutes after the order was placed, or null for a stage that has not happened. */
-  minutes_after_placed: number | null;
-  detail?: string;
-}
+/** A stored order record. PII fields exist in storage but are never part of the tool result. */
+export type OrderRecord = LookupOrderResult & {
+  customer_email?: string | null;
+  customer_id?: string | null;
+};
 
 export interface FixtureOrder {
-  order_id: string;
-  status: OrderStatus;
-  restaurant: { id: string; name: string; area: string; cuisine: string };
-  items: FixtureOrderItem[];
-  placed_minutes_ago: number;
-  /** The checkout ETA, in minutes after placement. This is the promise late credits are measured against. */
-  promised_after_placed: number;
-  /** Current estimate, in minutes after placement. For delivered orders, the actual handover time. */
-  estimate_after_placed: number;
-  timeline: FixtureTimelineStep[];
-  delivery_fee_minor: number;
-  delivery_area: string;
-  payment_method: string;
-  rider?: { first_name: string; vehicle: string };
-  discount_minor?: number;
-  tip_minor?: number;
-  cancellation?: {
-    by: "customer" | "restaurant" | "quickbite";
-    reason: string;
-    minutes_after_placed: number;
-  };
-  refund?: {
-    status: "initiated" | "processing" | "completed";
-    method: string;
-    expected_in_days: number;
-  };
+  record: OrderRecord;
+  /** Shift timestamps so the order stays "in progress" whenever the demo is opened. */
+  live: boolean;
 }
 
-const CURRENCY = "INR";
-const PLATFORM_FEE_MINOR = 600;
-const GST_RATE = 0.05;
+/** Every live fixture's timestamps are written as if the current time were this moment. */
+const ANCHOR_MS = Date.parse("2026-09-14T19:42:07+05:30");
+const IST_OFFSET_MS = 5.5 * 3_600_000;
 
 export const ORDERS: readonly FixtureOrder[] = [
   {
-    order_id: "QB-48213",
-    status: "out_for_delivery",
-    restaurant: {
-      id: "rst_dosa-republic",
-      name: "Dosa Republic",
-      area: "Indiranagar",
-      cuisine: "South Indian",
-    },
-    items: [
-      {
-        name: "Masala Dosa",
-        quantity: 2,
-        unit_price_minor: 14900,
-        modifiers: ["Extra coconut chutney"],
+    live: true,
+    record: {
+      order_id: "QB-2026-481213",
+      customer_email: "priya.sharma@example.com",
+      customer_id: "CUST-014",
+      restaurant: { name: "Dosa Republic", cuisine: "South Indian", distance_km: 3.4 },
+      items: [
+        { name: "Masala Dosa", quantity: 2, unit_price: 149, line_total: 298 },
+        { name: "Medu Vada", quantity: 1, unit_price: 89, line_total: 89 },
+        { name: "Filter Coffee", quantity: 2, unit_price: 59, line_total: 118 },
+      ],
+      subtotal: 505,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 35,
+        surge_fee: 0,
+        packaging_charge: 15,
+        platform_fee: 6,
+        small_order_fee: 0,
       },
-      { name: "Medu Vada", quantity: 1, unit_price_minor: 8900 },
-      { name: "Filter Coffee", quantity: 2, unit_price_minor: 5900 },
-    ],
-    placed_minutes_ago: 52,
-    promised_after_placed: 35,
-    estimate_after_placed: 63,
-    timeline: [
-      { status: "placed", label: "Order placed", minutes_after_placed: 0 },
-      { status: "confirmed", label: "Restaurant confirmed", minutes_after_placed: 2 },
-      {
-        status: "preparing",
-        label: "Being prepared",
-        minutes_after_placed: 4,
-        detail: "Kitchen ran behind on a large order",
+      taxes: 25.0,
+      total: 586.0,
+      payment_method: "upi",
+      status: "picked_up",
+      timestamps: {
+        placed_at: "2026-09-14T18:50:07+05:30",
+        eta_at_checkout: "2026-09-14T19:25:07+05:30",
+        accepted_at: "2026-09-14T18:52:07+05:30",
+        final_eta: "2026-09-14T19:53:07+05:30",
+        ready_for_pickup_at: "2026-09-14T19:29:07+05:30",
+        picked_up_at: "2026-09-14T19:33:07+05:30",
+        delivered_at: null,
       },
-      { status: "out_for_delivery", label: "Picked up by Ravi", minutes_after_placed: 43 },
-      { status: "delivered", label: "Delivered", minutes_after_placed: null },
-    ],
-    delivery_fee_minor: 3500,
-    delivery_area: "HAL 2nd Stage, Indiranagar",
-    payment_method: "UPI",
-    rider: { first_name: "Ravi", vehicle: "Scooter" },
-    tip_minor: 2000,
-  },
-  {
-    order_id: "QB-51877",
-    status: "delivered",
-    restaurant: {
-      id: "rst_tandoor-theory",
-      name: "Tandoor Theory",
-      area: "Koramangala",
-      cuisine: "North Indian",
-    },
-    items: [
-      { name: "Paneer Butter Masala", quantity: 1, unit_price_minor: 28900 },
-      { name: "Garlic Naan", quantity: 2, unit_price_minor: 6500 },
-      { name: "Jeera Rice", quantity: 1, unit_price_minor: 14900 },
-      { name: "Boondi Raita", quantity: 1, unit_price_minor: 7900 },
-    ],
-    placed_minutes_ago: 61,
-    promised_after_placed: 38,
-    estimate_after_placed: 39,
-    timeline: [
-      { status: "placed", label: "Order placed", minutes_after_placed: 0 },
-      { status: "confirmed", label: "Restaurant confirmed", minutes_after_placed: 1 },
-      { status: "preparing", label: "Being prepared", minutes_after_placed: 3 },
-      { status: "out_for_delivery", label: "Picked up by Arjun", minutes_after_placed: 24 },
-      { status: "delivered", label: "Delivered", minutes_after_placed: 39 },
-    ],
-    delivery_fee_minor: 3500,
-    delivery_area: "5th Block, Koramangala",
-    payment_method: "Card •••• 4242",
-    rider: { first_name: "Arjun", vehicle: "Bike" },
-    discount_minor: 6000,
-    tip_minor: 3000,
-  },
-  {
-    order_id: "QB-49920",
-    status: "cancelled",
-    restaurant: {
-      id: "rst_green-fork",
-      name: "Green Fork Salads",
-      area: "HSR Layout",
-      cuisine: "Salads & Bowls",
-    },
-    items: [
-      { name: "Quinoa Power Bowl", quantity: 1, unit_price_minor: 32900 },
-      { name: "Green Goddess Salad", quantity: 1, unit_price_minor: 27900 },
-      { name: "Cold Pressed Orange", quantity: 1, unit_price_minor: 12900 },
-    ],
-    placed_minutes_ago: 26,
-    promised_after_placed: 40,
-    estimate_after_placed: 40,
-    timeline: [
-      { status: "placed", label: "Order placed", minutes_after_placed: 0 },
-      { status: "confirmed", label: "Restaurant confirmed", minutes_after_placed: 2 },
-      {
-        status: "cancelled",
-        label: "Cancelled by restaurant",
-        minutes_after_placed: 12,
-        detail: "Quinoa Power Bowl was out of stock",
+      delay_minutes_vs_final_eta: null,
+      driver: { driver_id: "DRV-1187", name: "Ravi Kumar", vehicle: "scooter", rating: 4.7 },
+      delivery: {
+        type: "handover",
+        address_label: "Home",
+        otp_required: true,
+        otp_entered: null,
+        proof_of_delivery_photo: null,
       },
-    ],
-    delivery_fee_minor: 3500,
-    delivery_area: "Sector 2, HSR Layout",
-    payment_method: "UPI",
-    cancellation: {
-      by: "restaurant",
-      reason: "Quinoa Power Bowl was out of stock",
-      minutes_after_placed: 12,
+      notes_to_restaurant: "Extra coconut chutney, please",
+      substitution: null,
+      cancellation: null,
+      refund: null,
+      issues: [],
     },
-    refund: { status: "initiated", method: "UPI", expected_in_days: 3 },
   },
   {
-    order_id: "QB-50342",
-    status: "preparing",
-    restaurant: {
-      id: "rst_ember-pizza",
-      name: "Ember Pizza Co.",
-      area: "Whitefield",
-      cuisine: "Pizza",
+    live: true,
+    record: {
+      order_id: "QB-2026-518772",
+      customer_email: "karthik.iyer@example.com",
+      customer_id: "CUST-031",
+      restaurant: { name: "Tandoor Theory", cuisine: "North Indian", distance_km: 2.6 },
+      items: [
+        { name: "Paneer Butter Masala", quantity: 1, unit_price: 289, line_total: 289 },
+        { name: "Garlic Naan", quantity: 2, unit_price: 65, line_total: 130 },
+        { name: "Jeera Rice", quantity: 1, unit_price: 149, line_total: 149 },
+        { name: "Boondi Raita", quantity: 1, unit_price: 79, line_total: 79 },
+      ],
+      subtotal: 647,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 35,
+        surge_fee: 0,
+        packaging_charge: 20,
+        platform_fee: 6,
+        small_order_fee: 0,
+      },
+      taxes: 32.0,
+      total: 740.0,
+      payment_method: "card",
+      status: "delivered",
+      timestamps: {
+        placed_at: "2026-09-14T18:41:07+05:30",
+        eta_at_checkout: "2026-09-14T19:22:07+05:30",
+        accepted_at: "2026-09-14T18:42:07+05:30",
+        final_eta: "2026-09-14T19:21:07+05:30",
+        ready_for_pickup_at: "2026-09-14T19:03:07+05:30",
+        picked_up_at: "2026-09-14T19:05:07+05:30",
+        delivered_at: "2026-09-14T19:20:07+05:30",
+      },
+      delay_minutes_vs_final_eta: -1,
+      driver: { driver_id: "DRV-2210", name: "Arjun Nair", vehicle: "bike", rating: 4.9 },
+      delivery: {
+        type: "contactless",
+        address_label: "Work",
+        otp_required: false,
+        otp_entered: null,
+        proof_of_delivery_photo: "pod/QB-2026-518772.jpg",
+      },
+      notes_to_restaurant: null,
+      substitution: null,
+      cancellation: null,
+      refund: null,
+      issues: [],
     },
-    items: [
-      { name: "Margherita Pizza", quantity: 1, unit_price_minor: 34900, modifiers: ["Thin crust"] },
-      { name: "Garlic Breadsticks", quantity: 1, unit_price_minor: 16900 },
-      { name: "Masala Lemonade", quantity: 2, unit_price_minor: 9900 },
-    ],
-    placed_minutes_ago: 9,
-    promised_after_placed: 42,
-    estimate_after_placed: 38,
-    timeline: [
-      { status: "placed", label: "Order placed", minutes_after_placed: 0 },
-      { status: "confirmed", label: "Restaurant confirmed", minutes_after_placed: 2 },
-      { status: "preparing", label: "Being prepared", minutes_after_placed: 5 },
-      { status: "out_for_delivery", label: "Out for delivery", minutes_after_placed: null },
-      { status: "delivered", label: "Delivered", minutes_after_placed: null },
-    ],
-    delivery_fee_minor: 4500,
-    delivery_area: "Palm Meadows, Whitefield",
-    payment_method: "QuickBite Wallet",
   },
   {
-    order_id: "QB-47105",
-    status: "delivered",
-    restaurant: {
-      id: "rst_saffron-lane",
-      name: "Saffron Lane Biryani",
-      area: "Jayanagar",
-      cuisine: "Biryani",
+    live: true,
+    record: {
+      order_id: "QB-2026-499203",
+      customer_email: "neha.gupta@example.com",
+      customer_id: "CUST-022",
+      restaurant: { name: "Green Fork Salads", cuisine: "Salads & Bowls", distance_km: 4.1 },
+      items: [
+        { name: "Quinoa Power Bowl", quantity: 1, unit_price: 329, line_total: 329 },
+        { name: "Green Goddess Salad", quantity: 1, unit_price: 279, line_total: 279 },
+        { name: "Cold Pressed Orange", quantity: 1, unit_price: 129, line_total: 129 },
+      ],
+      subtotal: 737,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 35,
+        surge_fee: 0,
+        packaging_charge: 20,
+        platform_fee: 6,
+        small_order_fee: 0,
+      },
+      taxes: 37.0,
+      total: 835.0,
+      payment_method: "upi",
+      status: "cancelled",
+      timestamps: {
+        placed_at: "2026-09-14T19:16:07+05:30",
+        eta_at_checkout: "2026-09-14T19:56:07+05:30",
+        accepted_at: "2026-09-14T19:18:07+05:30",
+        final_eta: null,
+        ready_for_pickup_at: null,
+        picked_up_at: null,
+        delivered_at: null,
+        cancelled_at: "2026-09-14T19:28:07+05:30",
+      },
+      delay_minutes_vs_final_eta: null,
+      driver: null,
+      delivery: {
+        type: "handover",
+        address_label: "Home",
+        otp_required: false,
+        otp_entered: null,
+        proof_of_delivery_photo: null,
+      },
+      notes_to_restaurant: null,
+      substitution: null,
+      cancellation: {
+        cancelled_by: "restaurant",
+        reason: "Quinoa Power Bowl was out of stock",
+        cancelled_at: "2026-09-14T19:28:07+05:30",
+      },
+      refund: {
+        status: "initiated",
+        amount: 835.0,
+        method: "upi",
+        initiated_at: "2026-09-14T19:28:40+05:30",
+        expected_by: "2026-09-17T19:28:40+05:30",
+      },
+      issues: [],
     },
-    items: [
-      { name: "Hyderabadi Chicken Biryani", quantity: 2, unit_price_minor: 32900 },
-      { name: "Mirchi Ka Salan", quantity: 1, unit_price_minor: 8900 },
-      { name: "Double Ka Meetha", quantity: 1, unit_price_minor: 11900 },
-    ],
-    placed_minutes_ago: 1490,
-    promised_after_placed: 45,
-    estimate_after_placed: 41,
-    timeline: [
-      { status: "placed", label: "Order placed", minutes_after_placed: 0 },
-      { status: "confirmed", label: "Restaurant confirmed", minutes_after_placed: 2 },
-      { status: "preparing", label: "Being prepared", minutes_after_placed: 4 },
-      { status: "out_for_delivery", label: "Picked up by Suresh", minutes_after_placed: 26 },
-      { status: "delivered", label: "Delivered", minutes_after_placed: 41 },
-    ],
-    delivery_fee_minor: 3500,
-    delivery_area: "4th Block, Jayanagar",
-    payment_method: "UPI",
-    rider: { first_name: "Suresh", vehicle: "Bike" },
   },
   {
-    order_id: "QB-52260",
-    status: "confirmed",
-    restaurant: {
-      id: "rst_noodle-bar-88",
-      name: "Noodle Bar 88",
-      area: "Indiranagar",
-      cuisine: "Asian",
+    live: true,
+    record: {
+      order_id: "QB-2026-503420",
+      customer_email: "rahul.menon@example.com",
+      customer_id: "CUST-047",
+      restaurant: { name: "Ember Pizza Co.", cuisine: "Pizza", distance_km: 5.2 },
+      items: [
+        { name: "Margherita Pizza", quantity: 1, unit_price: 349, line_total: 349 },
+        { name: "Garlic Breadsticks", quantity: 1, unit_price: 169, line_total: 169 },
+        { name: "Masala Lemonade", quantity: 2, unit_price: 99, line_total: 198 },
+      ],
+      subtotal: 716,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 45,
+        surge_fee: 25,
+        packaging_charge: 25,
+        platform_fee: 6,
+        small_order_fee: 0,
+      },
+      taxes: 36.0,
+      total: 853.0,
+      payment_method: "wallet",
+      status: "preparing",
+      timestamps: {
+        placed_at: "2026-09-14T19:33:07+05:30",
+        eta_at_checkout: "2026-09-14T20:15:07+05:30",
+        accepted_at: "2026-09-14T19:35:07+05:30",
+        final_eta: "2026-09-14T20:11:07+05:30",
+        ready_for_pickup_at: null,
+        picked_up_at: null,
+        delivered_at: null,
+      },
+      delay_minutes_vs_final_eta: null,
+      driver: null,
+      delivery: {
+        type: "handover",
+        address_label: "Home",
+        otp_required: true,
+        otp_entered: null,
+        proof_of_delivery_photo: null,
+      },
+      notes_to_restaurant: null,
+      substitution: null,
+      cancellation: null,
+      refund: null,
+      issues: [],
     },
-    items: [
-      { name: "Veg Hakka Noodles", quantity: 1, unit_price_minor: 21900 },
-      { name: "Chilli Paneer", quantity: 1, unit_price_minor: 25900 },
-    ],
-    placed_minutes_ago: 3,
-    promised_after_placed: 40,
-    estimate_after_placed: 40,
-    timeline: [
-      { status: "placed", label: "Order placed", minutes_after_placed: 0 },
-      { status: "confirmed", label: "Restaurant confirmed", minutes_after_placed: 2 },
-      { status: "preparing", label: "Being prepared", minutes_after_placed: null },
-      { status: "out_for_delivery", label: "Out for delivery", minutes_after_placed: null },
-      { status: "delivered", label: "Delivered", minutes_after_placed: null },
-    ],
-    delivery_fee_minor: 3500,
-    delivery_area: "Defence Colony, Indiranagar",
-    payment_method: "UPI",
+  },
+  {
+    live: true,
+    record: {
+      order_id: "QB-2026-471055",
+      customer_email: "ananya.rao@example.com",
+      customer_id: "CUST-009",
+      restaurant: { name: "Saffron Lane Biryani", cuisine: "Biryani", distance_km: 3.9 },
+      items: [
+        { name: "Hyderabadi Chicken Biryani", quantity: 2, unit_price: 329, line_total: 658 },
+        { name: "Mirchi Ka Salan", quantity: 1, unit_price: 89, line_total: 89 },
+        { name: "Double Ka Meetha", quantity: 1, unit_price: 119, line_total: 119 },
+      ],
+      subtotal: 866,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 35,
+        surge_fee: 0,
+        packaging_charge: 30,
+        platform_fee: 6,
+        small_order_fee: 0,
+      },
+      taxes: 43.0,
+      total: 980.0,
+      payment_method: "upi",
+      status: "delivered",
+      timestamps: {
+        placed_at: "2026-09-13T19:52:07+05:30",
+        eta_at_checkout: "2026-09-13T20:37:07+05:30",
+        accepted_at: "2026-09-13T19:54:07+05:30",
+        final_eta: "2026-09-13T20:34:07+05:30",
+        ready_for_pickup_at: "2026-09-13T20:14:07+05:30",
+        picked_up_at: "2026-09-13T20:18:07+05:30",
+        delivered_at: "2026-09-13T20:33:07+05:30",
+      },
+      delay_minutes_vs_final_eta: -1,
+      driver: { driver_id: "DRV-3021", name: "Suresh Babu", vehicle: "bike", rating: 4.6 },
+      delivery: {
+        type: "handover",
+        address_label: "Home",
+        otp_required: false,
+        otp_entered: null,
+        proof_of_delivery_photo: null,
+      },
+      notes_to_restaurant: null,
+      substitution: null,
+      cancellation: null,
+      refund: null,
+      issues: [],
+    },
+  },
+  {
+    live: true,
+    record: {
+      order_id: "QB-2026-522604",
+      customer_email: "vikram.shetty@example.com",
+      customer_id: "CUST-058",
+      restaurant: { name: "Noodle Bar 88", cuisine: "Asian", distance_km: 2.2 },
+      items: [
+        { name: "Veg Hakka Noodles", quantity: 1, unit_price: 219, line_total: 219 },
+        { name: "Chilli Paneer", quantity: 1, unit_price: 259, line_total: 259 },
+      ],
+      subtotal: 478,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 35,
+        surge_fee: 0,
+        packaging_charge: 15,
+        platform_fee: 6,
+        small_order_fee: 0,
+      },
+      taxes: 24.0,
+      total: 558.0,
+      payment_method: "upi",
+      status: "accepted",
+      timestamps: {
+        placed_at: "2026-09-14T19:39:07+05:30",
+        eta_at_checkout: "2026-09-14T20:16:07+05:30",
+        accepted_at: "2026-09-14T19:41:07+05:30",
+        final_eta: "2026-09-14T20:16:07+05:30",
+        ready_for_pickup_at: null,
+        picked_up_at: null,
+        delivered_at: null,
+      },
+      delay_minutes_vs_final_eta: null,
+      driver: null,
+      delivery: {
+        type: "handover",
+        address_label: "Home",
+        otp_required: false,
+        otp_entered: null,
+        proof_of_delivery_photo: null,
+      },
+      notes_to_restaurant: null,
+      substitution: null,
+      cancellation: null,
+      refund: null,
+      issues: [],
+    },
+  },
+  {
+    // A real sample record from the order service, unshifted.
+    live: false,
+    record: {
+      order_id: "QB-2026-398971",
+      customer_email: "arjun.mehta@example.com",
+      customer_id: "CUST-002",
+      restaurant: { name: "Chai Point Cafe", cuisine: "Cafe", distance_km: 1.8 },
+      items: [
+        { name: "Blueberry Muffin", quantity: 1, unit_price: 140, line_total: 140 },
+        { name: "Cappuccino", quantity: 1, unit_price: 160, line_total: 160 },
+      ],
+      subtotal: 300,
+      discount: { promo_code: null, amount: 0.0 },
+      fees: {
+        delivery_fee: 0,
+        surge_fee: 25,
+        packaging_charge: 20,
+        platform_fee: 6,
+        small_order_fee: 0,
+      },
+      taxes: 15.0,
+      total: 366.0,
+      payment_method: "upi",
+      status: "delivered",
+      timestamps: {
+        placed_at: "2026-08-12T00:30:00+05:30",
+        eta_at_checkout: "2026-08-12T01:05:00+05:30",
+        accepted_at: "2026-08-12T00:33:00+05:30",
+        final_eta: "2026-08-12T01:08:00+05:30",
+        ready_for_pickup_at: "2026-08-12T00:47:00+05:30",
+        picked_up_at: "2026-08-12T00:52:00+05:30",
+        delivered_at: "2026-08-12T01:05:00+05:30",
+      },
+      delay_minutes_vs_final_eta: -3,
+      driver: { driver_id: "DRV-2402", name: "Naveen Raj", vehicle: "bike", rating: 4.8 },
+      delivery: {
+        type: "handover",
+        address_label: "Home",
+        otp_required: false,
+        otp_entered: null,
+        proof_of_delivery_photo: null,
+      },
+      notes_to_restaurant: null,
+      substitution: null,
+      cancellation: null,
+      refund: null,
+      issues: [],
+    },
   },
 ];
 
 export const ORDERS_BY_ID: ReadonlyMap<string, FixtureOrder> = new Map(
-  ORDERS.map((order) => [order.order_id, order]),
+  ORDERS.map((order) => [order.record.order_id, order]),
 );
 
-/** Accepts "qb48213", "QB 48213", "#QB-48213" and normalises to "QB-48213". */
+/** Accepts "qb-2026-481213", "QB 2026 481213", "#QB2026481213" and normalises to "QB-2026-481213". */
 export function normalizeOrderId(raw: string): string | null {
   const compact = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const match = /^QB(\d{5})$/.exec(compact);
-  return match ? `QB-${match[1]}` : null;
+  const match = /^QB(\d{4})(\d{6})$/.exec(compact);
+  return match ? `QB-${match[1]}-${match[2]}` : null;
 }
 
 export function findOrder(rawId: string): FixtureOrder | null {
@@ -267,112 +404,68 @@ export function findOrder(rawId: string): FixtureOrder | null {
   return id ? (ORDERS_BY_ID.get(id) ?? null) : null;
 }
 
-export function money(amountMinor: number): Money {
-  return { amount_minor: amountMinor, currency: CURRENCY };
+/** Format an instant as the order service does: second precision with an IST offset. */
+function toIstIso(ms: number): string {
+  return `${new Date(ms + IST_OFFSET_MS).toISOString().slice(0, 19)}+05:30`;
 }
 
-export function formatRupees(amountMinor: number): string {
-  const rupees = amountMinor / 100;
-  return `₹${Number.isInteger(rupees) ? rupees.toString() : rupees.toFixed(2)}`;
+function shiftTime(value: string, shiftMs: number): string {
+  const time = Date.parse(value);
+  return Number.isNaN(time) || shiftMs === 0 ? value : toIstIso(time + shiftMs);
 }
 
-export function itemTotalMinor(item: FixtureOrderItem): number {
-  return item.quantity * item.unit_price_minor;
+function shiftNullable(value: string | null | undefined, shiftMs: number): string | null {
+  return value ? shiftTime(value, shiftMs) : null;
 }
 
-export function subtotalMinor(order: FixtureOrder): number {
-  return order.items.reduce((sum, item) => sum + itemTotalMinor(item), 0);
+/** Shift any `*_at` / `*_by` date strings inside a free-form record such as a refund. */
+function shiftRecordTimes(
+  record: Record<string, unknown> | null | undefined,
+  shiftMs: number,
+): Record<string, unknown> | null {
+  if (!record) return null;
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      typeof value === "string" && /_(at|by)$/.test(key) ? shiftTime(value, shiftMs) : value,
+    ]),
+  );
 }
 
-/** Materialise a fixture order into the contract's tool-result shape, relative to `now`. */
-export function buildLookupOrderResult(order: FixtureOrder, now: Date): LookupOrderResult {
-  const nowMs = now.getTime();
-  const placedMs = nowMs - order.placed_minutes_ago * 60_000;
-  const at = (minutesAfterPlaced: number) => new Date(placedMs + minutesAfterPlaced * 60_000);
-
-  const subtotal = subtotalMinor(order);
-  // GST rounded to the nearest rupee, then a flat platform fee — matches how the app itemises it.
-  const taxesAndFees = Math.round((subtotal * GST_RATE) / 100) * 100 + PLATFORM_FEE_MINOR;
-  const discount = order.discount_minor ?? 0;
-  const tip = order.tip_minor ?? 0;
-  const total = subtotal + order.delivery_fee_minor + taxesAndFees - discount + tip;
-
-  const promisedBy = at(order.promised_after_placed);
-  const estimatedAt = at(order.estimate_after_placed);
-  const isDelivered = order.status === "delivered";
-  const isCancelled = order.status === "cancelled";
-  const minutesLate = Math.round((estimatedAt.getTime() - promisedBy.getTime()) / 60_000);
-  const isLate = minutesLate > 0;
-
-  const timeline: OrderTimelineEvent[] = order.timeline.map((step) => ({
-    status: step.status,
-    label: step.label,
-    at: step.minutes_after_placed === null ? null : at(step.minutes_after_placed).toISOString(),
-    state:
-      step.minutes_after_placed === null
-        ? "upcoming"
-        : step.status === order.status
-          ? "current"
-          : "complete",
-    detail: step.detail ?? null,
-  }));
+/** Materialise a fixture into the tool result. Customer identifiers never leave this function. */
+export function buildLookupOrderResult(fixture: FixtureOrder, now: Date): LookupOrderResult {
+  const source = fixture.record;
+  const shiftMs = fixture.live ? now.getTime() - ANCHOR_MS : 0;
+  const t = source.timestamps;
 
   return {
-    order_id: order.order_id,
-    status: order.status,
-    placed_at: new Date(placedMs).toISOString(),
-    restaurant: {
-      id: order.restaurant.id,
-      name: order.restaurant.name,
-      area: order.restaurant.area,
-      cuisine: order.restaurant.cuisine,
+    order_id: source.order_id,
+    status: source.status,
+    restaurant: source.restaurant,
+    items: source.items,
+    subtotal: source.subtotal,
+    discount: source.discount,
+    fees: source.fees,
+    taxes: source.taxes,
+    total: source.total,
+    payment_method: source.payment_method,
+    timestamps: {
+      placed_at: shiftTime(t.placed_at, shiftMs),
+      eta_at_checkout: shiftNullable(t.eta_at_checkout, shiftMs),
+      accepted_at: shiftNullable(t.accepted_at, shiftMs),
+      final_eta: shiftNullable(t.final_eta, shiftMs),
+      ready_for_pickup_at: shiftNullable(t.ready_for_pickup_at, shiftMs),
+      picked_up_at: shiftNullable(t.picked_up_at, shiftMs),
+      delivered_at: shiftNullable(t.delivered_at, shiftMs),
+      cancelled_at: shiftNullable(t.cancelled_at, shiftMs),
     },
-    items: order.items.map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-      unit_price: money(item.unit_price_minor),
-      modifiers: item.modifiers ?? null,
-    })),
-    totals: {
-      subtotal: money(subtotal),
-      delivery_fee: money(order.delivery_fee_minor),
-      taxes_and_fees: money(taxesAndFees),
-      discount: money(discount),
-      tip: tip > 0 ? money(tip) : null,
-      total: money(total),
-    },
-    eta: isCancelled
-      ? null
-      : {
-          promised_by: promisedBy.toISOString(),
-          estimated_at: estimatedAt.toISOString(),
-          minutes_remaining: isDelivered
-            ? null
-            : Math.max(1, Math.round((estimatedAt.getTime() - nowMs) / 60_000)),
-          is_late: isLate,
-          minutes_late: isLate ? minutesLate : null,
-        },
-    delivered_at: isDelivered ? estimatedAt.toISOString() : null,
-    timeline,
-    rider: order.rider
-      ? { first_name: order.rider.first_name, vehicle: order.rider.vehicle }
-      : null,
-    delivery_area: order.delivery_area,
-    payment_method: order.payment_method,
-    cancellation: order.cancellation
-      ? {
-          by: order.cancellation.by,
-          reason: order.cancellation.reason,
-          at: at(order.cancellation.minutes_after_placed).toISOString(),
-        }
-      : null,
-    refund: order.refund
-      ? {
-          status: order.refund.status,
-          amount: money(total),
-          method: order.refund.method,
-          expected_by: new Date(nowMs + order.refund.expected_in_days * 86_400_000).toISOString(),
-        }
-      : null,
+    delay_minutes_vs_final_eta: source.delay_minutes_vs_final_eta,
+    driver: source.driver,
+    delivery: source.delivery,
+    notes_to_restaurant: source.notes_to_restaurant,
+    substitution: source.substitution,
+    cancellation: shiftRecordTimes(source.cancellation, shiftMs),
+    refund: shiftRecordTimes(source.refund, shiftMs),
+    issues: source.issues,
   };
 }

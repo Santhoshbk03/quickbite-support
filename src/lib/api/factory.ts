@@ -7,6 +7,7 @@ import type { ChatClient } from "./client";
 import { readApiConfig } from "./config";
 import type { ApiConfig } from "./config";
 import { HttpChatClient } from "./http-client";
+import { ResilientChatClient } from "./resilient-client";
 import { MockChatClient } from "./mock/mock-client";
 import type { MockChatClientOptions } from "./mock/mock-client";
 
@@ -24,7 +25,12 @@ export function createChatClient(options: CreateChatClientOptions = {}): ChatCli
   // config.apiUrl is guaranteed non-null in live mode: readApiConfig() downgrades a live mode with
   // no URL to mock and records configError, so a deploy typo degrades instead of white-screening.
   if (config.mode === "live" && config.apiUrl) {
-    return new HttpChatClient({ baseUrl: config.apiUrl, fetchImpl: options.fetchImpl });
+    // A cold, rate-limited, or down backend must never break the demo: answer from fixtures instead
+    // and let the UI say so.
+    return new ResilientChatClient(
+      new HttpChatClient({ baseUrl: config.apiUrl, fetchImpl: options.fetchImpl }),
+      () => new MockChatClient({ profile: "demo", ...options.mock }),
+    );
   }
 
   return new MockChatClient({ profile: config.mockProfile, ...options.mock });

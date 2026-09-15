@@ -8,14 +8,15 @@
  * - P0 fields are required. "Nullable P0" fields must be present but may be null.
  * - P1/P2 fields are `.nullish()`, so a backend that omits them still parses and the UI hides the
  *   dependent section.
- * - Unknown keys are stripped, so the backend may add fields without breaking the client.
+ * - Unknown keys are stripped, so the backend may add fields without breaking the client — and
+ *   fields the client must never keep (like `customer_email` on an order) are dropped on parse.
  *
  * Keep this file erasable-syntax only (no enums, namespaces, parameter properties): the contract
  * scripts run it directly under Node's type stripping.
  */
 import { z } from "zod";
 
-export const CONTRACT_VERSION = "1.0.0";
+export const CONTRACT_VERSION = "1.1.0";
 
 export const MAX_MESSAGE_CHARS = 4000;
 export const MAX_HISTORY_MESSAGES = 50;
@@ -28,11 +29,6 @@ export const IdSchema = z.string().min(1).max(128);
 export const DateTimeSchema = z.iso.datetime({ offset: true });
 export const DateSchema = z.iso.date();
 const Milliseconds = z.number().min(0);
-
-export const MoneySchema = z.object({
-  amount_minor: z.number().int(),
-  currency: z.string().length(3),
-});
 
 export const DistanceMetricSchema = z.enum(["cosine", "l2", "ip"]);
 
@@ -77,84 +73,109 @@ export const RetrievalSchema = z.object({
  * §3 Tool calls
  * -----------------------------------------------------------------------------------------------*/
 
-export const OrderStatusSchema = z.enum([
+/**
+ * Statuses the interface has labels for. `status` itself is an open string, so a new status from the
+ * order service renders humanised instead of failing validation.
+ */
+export const KNOWN_ORDER_STATUSES = [
   "placed",
-  "confirmed",
+  "accepted",
   "preparing",
+  "ready_for_pickup",
+  "picked_up",
   "out_for_delivery",
   "delivered",
   "cancelled",
-]);
+] as const;
 
-export const TimelineStateSchema = z.enum(["complete", "current", "upcoming", "skipped"]);
-
-export const OrderTimelineEventSchema = z.object({
-  status: OrderStatusSchema,
-  label: z.string().min(1),
-  at: DateTimeSchema.nullable(),
-  state: TimelineStateSchema,
-  detail: z.string().nullish(),
-});
+/** Amounts are major currency units (rupees), exactly as the order service stores them. */
+const Amount = z.number();
 
 export const OrderItemSchema = z.object({
   name: z.string().min(1),
   quantity: z.number().int().min(1),
-  unit_price: MoneySchema,
-  modifiers: z.array(z.string()).nullish(),
+  unit_price: Amount,
+  line_total: Amount.nullish(),
+});
+
+export const OrderTimestampsSchema = z.object({
+  placed_at: DateTimeSchema,
+  /** The ETA shown at checkout: what late-delivery compensation is measured against. */
+  eta_at_checkout: DateTimeSchema.nullish(),
+  accepted_at: DateTimeSchema.nullish(),
+  /** The latest estimate. */
+  final_eta: DateTimeSchema.nullish(),
+  ready_for_pickup_at: DateTimeSchema.nullish(),
+  picked_up_at: DateTimeSchema.nullish(),
+  delivered_at: DateTimeSchema.nullish(),
+  cancelled_at: DateTimeSchema.nullish(),
 });
 
 export const LookupOrderArgumentsSchema = z.object({
   order_id: z.string().min(1),
 });
 
+/**
+ * The order record as the order service stores it. The backend can pass it through unchanged: the
+ * timeline, lateness, and charge lines are derived client-side. `customer_email` and `customer_id`
+ * are deliberately absent, so they are stripped on parse and never stored or rendered.
+ */
 export const LookupOrderResultSchema = z.object({
   order_id: z.string().min(1),
-  status: OrderStatusSchema,
-  placed_at: DateTimeSchema,
+  status: z.string().min(1),
   restaurant: z.object({
-    id: IdSchema,
     name: z.string().min(1),
-    area: z.string().nullish(),
     cuisine: z.string().nullish(),
+    distance_km: z.number().min(0).nullish(),
   }),
   items: z.array(OrderItemSchema).min(1),
-  totals: z.object({
-    subtotal: MoneySchema.nullish(),
-    delivery_fee: MoneySchema.nullish(),
-    taxes_and_fees: MoneySchema.nullish(),
-    discount: MoneySchema.nullish(),
-    tip: MoneySchema.nullish(),
-    total: MoneySchema,
-  }),
-  eta: z
+  subtotal: Amount.nullish(),
+  discount: z
     .object({
-      promised_by: DateTimeSchema.nullish(),
-      estimated_at: DateTimeSchema.nullish(),
-      minutes_remaining: z.number().int().nullish(),
-      is_late: z.boolean(),
-      minutes_late: z.number().int().min(0).nullish(),
+      promo_code: z.string().nullish(),
+      amount: Amount,
     })
-    .nullable(),
-  delivered_at: DateTimeSchema.nullish(),
-  timeline: z.array(OrderTimelineEventSchema).min(1),
-  rider: z.object({ first_name: z.string().min(1), vehicle: z.string().nullish() }).nullish(),
-  delivery_area: z.string().nullish(),
+    .nullish(),
+  fees: z
+    .object({
+      delivery_fee: Amount.nullish(),
+      surge_fee: Amount.nullish(),
+      packaging_charge: Amount.nullish(),
+      platform_fee: Amount.nullish(),
+      small_order_fee: Amount.nullish(),
+    })
+    .nullish(),
+  taxes: Amount.nullish(),
+  total: Amount,
+  /** Not in the order record today; the interface assumes INR when absent. */
+  currency: z.string().length(3).nullish(),
   payment_method: z.string().nullish(),
-  cancellation: z
+  timestamps: OrderTimestampsSchema,
+  delay_minutes_vs_final_eta: z.number().nullish(),
+  driver: z
     .object({
-      by: z.enum(["customer", "restaurant", "quickbite"]),
-      reason: z.string().min(1),
-      at: DateTimeSchema.nullish(),
+      driver_id: z.string().nullish(),
+      /** Full name as stored; the interface shows only the first name. */
+      name: z.string().min(1),
+      vehicle: z.string().nullish(),
+      rating: z.number().min(0).max(5).nullish(),
     })
     .nullish(),
-  refund: z
+  delivery: z
     .object({
-      status: z.enum(["initiated", "processing", "completed"]),
-      amount: MoneySchema,
-      method: z.string().min(1),
-      expected_by: DateTimeSchema.nullish(),
+      type: z.string().nullish(),
+      address_label: z.string().nullish(),
+      otp_required: z.boolean().nullish(),
+      otp_entered: z.union([z.boolean(), z.string()]).nullish(),
+      proof_of_delivery_photo: z.string().nullish(),
     })
     .nullish(),
+  notes_to_restaurant: z.string().nullish(),
+  /** Shapes not fixed yet: rendered defensively from whichever known keys are present. */
+  substitution: z.record(z.string(), z.unknown()).nullish(),
+  cancellation: z.record(z.string(), z.unknown()).nullish(),
+  refund: z.record(z.string(), z.unknown()).nullish(),
+  issues: z.array(z.unknown()).nullish(),
 });
 
 export const ToolErrorSchema = z.object({
@@ -546,16 +567,14 @@ export const FeedbackRequestSchema = z.object({
  * Inferred types
  * -----------------------------------------------------------------------------------------------*/
 
-export type Money = z.infer<typeof MoneySchema>;
 export type DistanceMetric = z.infer<typeof DistanceMetricSchema>;
 export type SourceDocument = z.infer<typeof SourceDocumentSchema>;
 export type SourceChunk = z.infer<typeof SourceChunkSchema>;
 export type Retrieval = z.infer<typeof RetrievalSchema>;
 
-export type OrderStatus = z.infer<typeof OrderStatusSchema>;
-export type TimelineState = z.infer<typeof TimelineStateSchema>;
-export type OrderTimelineEvent = z.infer<typeof OrderTimelineEventSchema>;
+export type KnownOrderStatus = (typeof KNOWN_ORDER_STATUSES)[number];
 export type OrderItem = z.infer<typeof OrderItemSchema>;
+export type OrderTimestamps = z.infer<typeof OrderTimestampsSchema>;
 export type LookupOrderArguments = z.infer<typeof LookupOrderArgumentsSchema>;
 export type LookupOrderResult = z.infer<typeof LookupOrderResultSchema>;
 export type ToolError = z.infer<typeof ToolErrorSchema>;

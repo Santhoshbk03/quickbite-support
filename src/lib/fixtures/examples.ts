@@ -36,7 +36,7 @@ export const EXAMPLE_QUESTIONS: readonly ExampleQuestion[] = [
     id: "example_refund_case",
     label: "Missing item and cold food",
     question:
-      "My order QB-51877 came without the garlic naan and the paneer was lukewarm. Can I get a refund?",
+      "My order QB-2026-518772 came without the garlic naan and the paneer was lukewarm. Can I get a refund?",
     demonstrates: "Tool call plus three policy chunks to settle two claims at once",
     capability: "refund",
     followUps: ["How long will the refund take?", "Can I get it as Wallet credit instead?"],
@@ -44,7 +44,7 @@ export const EXAMPLE_QUESTIONS: readonly ExampleQuestion[] = [
   {
     id: "example_order_lookup",
     label: "Track a late order",
-    question: "Where's my order QB-48213? It's been almost an hour.",
+    question: "Where's my order QB-2026-481213? It's been almost an hour.",
     demonstrates: "lookup_order tool call rendered as a live order card",
     capability: "multi_turn",
     followUps: ["Do I get anything for the delay?", "Can I just cancel it instead?"],
@@ -52,7 +52,7 @@ export const EXAMPLE_QUESTIONS: readonly ExampleQuestion[] = [
   {
     id: "example_cancelled_order",
     label: "Cancelled by the restaurant",
-    question: "What happened to my order QB-49920? The app just says cancelled.",
+    question: "What happened to my order QB-2026-499203? The app just says cancelled.",
     demonstrates: "Order state and the automatic refund path, from tool data plus policy",
     capability: "tool_use",
     followUps: ["When will the refund reach my UPI?"],
