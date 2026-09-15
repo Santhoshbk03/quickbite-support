@@ -4,12 +4,14 @@ import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { HoverEffect } from "@/components/ui/card-hover-effect";
 import type { HoverEffectItem } from "@/components/ui/card-hover-effect";
+import { useSession } from "@/lib/auth/session";
+import { firstName } from "@/lib/order-view";
 
 const EXAMPLES: HoverEffectItem[] = [
   {
-    id: "late-order",
-    title: "Where is my order QB-2026-481213?",
-    description: "Looks up a live order that is running late.",
+    id: "latest-order",
+    title: "Where is my latest order?",
+    description: "Looks up your most recent order.",
     eyebrow: (
       <Badge size="sm" tone="brand">
         Order
@@ -17,9 +19,9 @@ const EXAMPLES: HoverEffectItem[] = [
     ),
   },
   {
-    id: "cancelled-order",
-    title: "What happened to order QB-2026-499203?",
-    description: "A restaurant cancellation with a refund on the way.",
+    id: "late-order",
+    title: "Is my order running late?",
+    description: "Checks your orders in progress against the time promised at checkout.",
     eyebrow: (
       <Badge size="sm" tone="brand">
         Order
@@ -63,16 +65,18 @@ export function ChatEmptyState({
   onPick: (question: string) => void;
   disabled: boolean;
 }) {
+  const name = useSession((state) => state.customer?.name);
+
   return (
     <div className="scrollbar-thin h-full overflow-y-auto">
       <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-10 sm:px-6">
         <LogoMark className="size-10" />
         <h1 className="mt-5 font-display-tight text-3xl font-medium text-fg sm:text-4xl">
-          How can we help?
+          {name ? `How can we help, ${firstName(name)}?` : "How can we help?"}
         </h1>
         <p className="mt-2 max-w-xl text-[0.9375rem] leading-relaxed text-fg-muted">
-          Ask about an order by its ID, or about refunds, delivery, payments, and other QuickBite
-          policies. Every answer links to the policy it came from.
+          Ask about your orders, or about refunds, delivery, payments, and other QuickBite policies.
+          Every answer links to the policy it came from.
         </p>
         <HoverEffect
           items={EXAMPLES}

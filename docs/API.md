@@ -1,23 +1,55 @@
 # QuickBite Support API
 
-The frontend needs **7 JSON endpoints**. Until they exist it runs on built-in demo data. To connect a backend:
+The frontend needs **8 JSON endpoints**. Until they exist it runs on built-in demo data. To connect a backend:
 
 ```bash
 NEXT_PUBLIC_API_MODE=live
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-| #   | Method | Path                    | Used by                               |
-| --- | ------ | ----------------------- | ------------------------------------- |
-| 1   | GET    | `/health`               | Status badge in the header            |
-| 2   | POST   | `/chat`                 | Chat                                  |
-| 3   | GET    | `/orders`               | Orders page                           |
-| 4   | GET    | `/orders/{order_id}`    | Order detail page                     |
-| 5   | GET    | `/policies`             | Policies page                         |
-| 6   | GET    | `/policies/{policy_id}` | Policy page, and source links in chat |
-| 7   | POST   | `/feedback`             | Thumbs up / down on an answer         |
+| #   | Method | Path                    | Needs `X-Customer-Email` | Used by                               |
+| --- | ------ | ----------------------- | ------------------------ | ------------------------------------- |
+| 1   | GET    | `/health`               | No                       | Status badge in the header            |
+| 2   | POST   | `/auth/login`           | No                       | Login page                            |
+| 3   | POST   | `/chat`                 | Yes                      | Chat                                  |
+| 4   | GET    | `/orders`               | Yes                      | Orders page                           |
+| 5   | GET    | `/orders/{order_id}`    | Yes                      | Order detail page                     |
+| 6   | GET    | `/policies`             | No                       | Policies page                         |
+| 7   | GET    | `/policies/{policy_id}` | No                       | Policy page, and source links in chat |
+| 8   | POST   | `/feedback`             | Yes                      | Thumbs up / down on an answer         |
 
 The source of truth is [`src/lib/api/types.ts`](../src/lib/api/types.ts): every response is validated against those Zod schemas. The live client is [`http.ts`](../src/lib/api/http.ts), and the demo data is [`mock.ts`](../src/lib/api/mock.ts).
+
+## Signing in
+
+The whole app requires a signed-in customer, and customers sign in with their email only.
+
+1. **Getting to the login page.** The main QuickBite app sends customers to `/login`. It can also link straight in with `/login?email=priya.sharma@example.com&next=/orders`. That link signs the customer in, removes the email from the address bar, and opens `next` (any path on this site; defaults to chat).
+2. **Checking the email.** The login page calls `POST /auth/login`, which checks that the email belongs to a customer.
+3. **Identifying the customer.** Every later request carries the header `X-Customer-Email: priya.sharma@example.com`. Use it to scope the data:
+   - `GET /orders` returns only that customer's orders.
+   - `GET /orders/{order_id}` returns `404` for an order that belongs to someone else. Don't reveal that it exists.
+   - `POST /chat` looks up only that customer's orders. "Where is my order?" can mean their latest one.
+4. **Ending a session.** If the header is missing or doesn't match a customer, return `401` with `{"detail": "Sign in to continue."}`. The app signs the customer out and returns to the login page.
+
+A FastAPI dependency covers step 3 and step 4:
+
+```python
+from fastapi import Depends, Header, HTTPException
+
+def current_customer(x_customer_email: str | None = Header(default=None)):
+    email = (x_customer_email or "").strip().lower()
+    customer = customers_by_email.get(email)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return customer
+
+@app.get("/orders")
+def list_orders(customer=Depends(current_customer)):
+    return {"orders": orders_for(customer["email"])}
+```
+
+> **Security note.** An email identifies a customer but doesn't prove who they are: anyone who knows someone's email can see their orders. That's fine for demo data. For real customers, have the main app pass a short-lived signed token instead, both in the link and as an `Authorization: Bearer` header. On the frontend that's a change to `src/lib/api/http.ts` and the login handoff in `src/components/auth/login-screen.tsx`.
 
 ## Conventions
 
@@ -25,12 +57,12 @@ The source of truth is [`src/lib/api/types.ts`](../src/lib/api/types.ts): every 
 - **Timestamps.** ISO 8601, preferably with an offset: `2026-08-12T00:30:00+05:30`.
 - **Money.** Amounts are numbers in major units (rupees): `366.0`. `currency` defaults to `INR`.
 - **Optional fields.** They can be `null` or left out.
-- **Unknown fields.** Extra fields are ignored and dropped. Customer identifiers such as `customer_email` and `customer_id` never reach the UI, but it's better not to send them at all.
+- **Unknown fields.** Extra fields are ignored and dropped. `customer_email` and `customer_id` on an order aren't needed in responses.
 - **Errors.** Return a non-2xx status with FastAPI's usual body, `{"detail": "Order not found"}`. A string `detail` is shown to the user.
 - **404.** Unknown order and policy ids should return `404`. The UI shows a "not found" state.
 - **Outages.** On a network error, timeout, or `5xx`, the app switches to demo data and shows a banner. It then checks `/health` every 30 seconds and switches back when that returns `ok`.
 - **Timeouts.** `/health` 5 s, `/chat` 60 s, everything else 10 s.
-- **CORS.** The browser calls the API directly, so allow the frontend's origin:
+- **CORS.** The browser calls the API directly, so allow the frontend's origin and the customer header:
 
   ```python
   from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +71,7 @@ The source of truth is [`src/lib/api/types.ts`](../src/lib/api/types.ts): every 
       CORSMiddleware,
       allow_origins=["http://localhost:3000", "https://quickbite-support.vercel.app"],
       allow_methods=["GET", "POST"],
-      allow_headers=["Content-Type"],
+      allow_headers=["Content-Type", "X-Customer-Email"],
   )
   ```
 
@@ -58,14 +90,37 @@ The source of truth is [`src/lib/api/types.ts`](../src/lib/api/types.ts): every 
 | `model`     | string                             | Optional                                        |
 | `documents` | integer                            | Optional. Number of indexed policy documents.   |
 
-## 2. `POST /chat`
+## 2. `POST /auth/login`
+
+**Request**
+
+```json
+{ "email": "priya.sharma@example.com" }
+```
+
+The frontend trims and lowercases the email. Compare emails case-insensitively.
+
+**Response**
+
+```json
+{ "customer": { "email": "priya.sharma@example.com", "name": "Priya Sharma" } }
+```
+
+| Field            | Type   | Notes                                                             |
+| ---------------- | ------ | ----------------------------------------------------------------- |
+| `customer.email` | string | Required. Sent back as `X-Customer-Email` on every later request. |
+| `customer.name`  | string | Optional. Shown in the header and the chat greeting.              |
+
+If no customer has that email, return `404` with `{"detail": "No account found for that email."}`. The login page shows its own message for a 404.
+
+## 3. `POST /chat`
 
 **Request**
 
 ```json
 {
   "session_id": "conv_3f9a1c2b7d4e8a10",
-  "message": "Where is my order QB-2026-481213?",
+  "message": "Where is my latest order?",
   "history": [
     { "role": "user", "content": "Hi" },
     { "role": "assistant", "content": "Hi! How can I help?" }
@@ -119,17 +174,17 @@ A declined question looks like this:
 }
 ```
 
-## 3. `GET /orders`
+## 4. `GET /orders`
 
 ```json
 { "orders": [Order, Order, ...] }
 ```
 
-Newest first.
+Only the signed-in customer's orders, newest first.
 
-## 4. `GET /orders/{order_id}`
+## 5. `GET /orders/{order_id}`
 
-Returns a single `Order`. If the id is unknown, return `404` with `{"detail": "Order not found"}`.
+Returns a single `Order`. If the id is unknown, or the order belongs to another customer, return `404` with `{"detail": "Order not found"}`.
 
 ### The Order object
 
@@ -189,7 +244,7 @@ Returns a single `Order`. If the id is unknown, return `404` with `{"detail": "O
 - **`issues`.** Entries can be strings or objects with a `description`.
 - **Driver name.** Only the driver's first name is shown.
 
-## 5. `GET /policies`
+## 6. `GET /policies`
 
 ```json
 {
@@ -208,7 +263,7 @@ Returns a single `Order`. If the id is unknown, return `404` with `{"detail": "O
 
 Only `id` and `title` are required. `category` drives the filter chips on the Policies page.
 
-## 6. `GET /policies/{policy_id}`
+## 7. `GET /policies/{policy_id}`
 
 Same fields as a policy in the list, plus `sections`:
 
@@ -231,7 +286,7 @@ Same fields as a policy in the list, plus `sections`:
 
 If the id is unknown, return `404`.
 
-## 7. `POST /feedback`
+## 8. `POST /feedback`
 
 ```json
 { "session_id": "conv_3f9a1c2b7d4e8a10", "message_id": "msg_91c2d0a4", "rating": "up" }

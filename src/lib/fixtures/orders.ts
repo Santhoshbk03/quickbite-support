@@ -79,8 +79,8 @@ export const ORDERS: readonly FixtureOrder[] = [
     live: true,
     record: {
       order_id: "QB-2026-518772",
-      customer_email: "karthik.iyer@example.com",
-      customer_id: "CUST-031",
+      customer_email: "arjun.mehta@example.com",
+      customer_id: "CUST-002",
       restaurant: { name: "Tandoor Theory", cuisine: "North Indian", distance_km: 2.6 },
       items: [
         { name: "Paneer Butter Masala", quantity: 1, unit_price: 289, line_total: 289 },
@@ -130,8 +130,8 @@ export const ORDERS: readonly FixtureOrder[] = [
     live: true,
     record: {
       order_id: "QB-2026-499203",
-      customer_email: "neha.gupta@example.com",
-      customer_id: "CUST-022",
+      customer_email: "priya.sharma@example.com",
+      customer_id: "CUST-014",
       restaurant: { name: "Green Fork Salads", cuisine: "Salads & Bowls", distance_km: 4.1 },
       items: [
         { name: "Quinoa Power Bowl", quantity: 1, unit_price: 329, line_total: 329 },
@@ -191,8 +191,8 @@ export const ORDERS: readonly FixtureOrder[] = [
     live: true,
     record: {
       order_id: "QB-2026-503420",
-      customer_email: "rahul.menon@example.com",
-      customer_id: "CUST-047",
+      customer_email: "arjun.mehta@example.com",
+      customer_id: "CUST-002",
       restaurant: { name: "Ember Pizza Co.", cuisine: "Pizza", distance_km: 5.2 },
       items: [
         { name: "Margherita Pizza", quantity: 1, unit_price: 349, line_total: 349 },
@@ -241,8 +241,8 @@ export const ORDERS: readonly FixtureOrder[] = [
     live: true,
     record: {
       order_id: "QB-2026-471055",
-      customer_email: "ananya.rao@example.com",
-      customer_id: "CUST-009",
+      customer_email: "priya.sharma@example.com",
+      customer_id: "CUST-014",
       restaurant: { name: "Saffron Lane Biryani", cuisine: "Biryani", distance_km: 3.9 },
       items: [
         { name: "Hyderabadi Chicken Biryani", quantity: 2, unit_price: 329, line_total: 658 },
@@ -291,8 +291,8 @@ export const ORDERS: readonly FixtureOrder[] = [
     live: true,
     record: {
       order_id: "QB-2026-522604",
-      customer_email: "vikram.shetty@example.com",
-      customer_id: "CUST-058",
+      customer_email: "priya.sharma@example.com",
+      customer_id: "CUST-014",
       restaurant: { name: "Noodle Bar 88", cuisine: "Asian", distance_km: 2.2 },
       items: [
         { name: "Veg Hakka Noodles", quantity: 1, unit_price: 219, line_total: 219 },
@@ -468,4 +468,31 @@ export function toApiOrder(fixture: FixtureOrder, now: Date): Order {
     refund: shiftRecordTimes(source.refund, shiftMs),
     issues: source.issues,
   };
+}
+
+/* Customers ------------------------------------------------------------------------------------*/
+
+export interface FixtureCustomer {
+  customer_id: string;
+  email: string;
+  name: string;
+}
+
+/** Demo accounts for email sign-in. Every order above belongs to one of them. */
+export const CUSTOMERS: readonly FixtureCustomer[] = [
+  { customer_id: "CUST-014", email: "priya.sharma@example.com", name: "Priya Sharma" },
+  { customer_id: "CUST-002", email: "arjun.mehta@example.com", name: "Arjun Mehta" },
+];
+
+export function findCustomer(email: string): FixtureCustomer | null {
+  const normalized = email.trim().toLowerCase();
+  return CUSTOMERS.find((customer) => customer.email === normalized) ?? null;
+}
+
+/** One customer's orders, newest first. */
+export function ordersForCustomer(email: string): FixtureOrder[] {
+  const normalized = email.trim().toLowerCase();
+  return ORDERS.filter((order) => order.record.customer_email === normalized).sort(
+    (a, b) => Date.parse(b.record.timestamps.placed_at) - Date.parse(a.record.timestamps.placed_at),
+  );
 }

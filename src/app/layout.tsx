@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 
-import { FallbackBanner } from "@/components/site/fallback-banner";
 import { Providers } from "@/components/site/providers";
-import { SiteHeader } from "@/components/site/site-header";
 import { resolveSiteUrl, SITE } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme-script";
 
@@ -72,21 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="bg-canvas font-sans text-fg antialiased">
-        <Providers>
-          <div className="flex h-dvh flex-col">
-            <a
-              href="#content"
-              className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-sm focus:bg-surface-3 focus:px-3 focus:py-2 focus:text-sm focus:text-fg"
-            >
-              Skip to content
-            </a>
-            <SiteHeader />
-            <FallbackBanner />
-            <div id="content" className="min-h-0 flex-1">
-              {children}
-            </div>
-          </div>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

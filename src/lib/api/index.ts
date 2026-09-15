@@ -3,23 +3,25 @@
  *
  * `api` picks the client from env (NEXT_PUBLIC_API_MODE, NEXT_PUBLIC_API_URL). In live mode, a
  * network error, timeout, or 5xx switches the app to demo data and raises the fallback banner, so a
- * demo never dead-ends on a sleeping backend. A successful /health check switches it back.
+ * demo never dead-ends on a sleeping backend. A successful /health check switches it back. A 401
+ * from either client ends the session, which sends the customer back to the login page.
  */
 import { create } from "zustand";
 
+import { getCustomerEmail, useSession } from "@/lib/auth/session";
 import { API_MODE, API_URL } from "./env";
 import type { ApiMode } from "./env";
 import { ApiError, createHttpApi } from "./http";
 import { createMockApi } from "./mock";
-import type { Health, QuickBiteApi } from "./types";
+import type { Customer, Health, QuickBiteApi } from "./types";
 
 export * from "./types";
-export { ApiError } from "./http";
+export { ApiError, CUSTOMER_EMAIL_HEADER } from "./http";
 export type { ApiErrorKind } from "./http";
 export type { ApiMode } from "./env";
 
-const mockApi = createMockApi();
-const liveApi = API_MODE === "live" && API_URL ? createHttpApi(API_URL) : null;
+const mockApi = createMockApi(getCustomerEmail);
+const liveApi = API_MODE === "live" && API_URL ? createHttpApi(API_URL, getCustomerEmail) : null;
 
 interface ApiStatus {
   mode: ApiMode;
@@ -36,7 +38,7 @@ export const useApiStatus = create<ApiStatus>(() => ({
   health: null,
 }));
 
-async function call<T>(run: (client: QuickBiteApi) => Promise<T>): Promise<T> {
+async function callClient<T>(run: (client: QuickBiteApi) => Promise<T>): Promise<T> {
   if (!liveApi || useApiStatus.getState().fallback) return run(mockApi);
   try {
     return await run(liveApi);
@@ -48,8 +50,19 @@ async function call<T>(run: (client: QuickBiteApi) => Promise<T>): Promise<T> {
   }
 }
 
+async function call<T>(run: (client: QuickBiteApi) => Promise<T>): Promise<T> {
+  try {
+    return await callClient(run);
+  } catch (error) {
+    const apiError = ApiError.from(error);
+    if (apiError.status === 401) useSession.getState().clear();
+    throw apiError;
+  }
+}
+
 export const api: QuickBiteApi = {
   health: () => call((client) => client.health()),
+  login: (request) => call((client) => client.login(request)),
   chat: (request) => call((client) => client.chat(request)),
   listOrders: () => call((client) => client.listOrders()),
   getOrder: (orderId) => call((client) => client.getOrder(orderId)),
@@ -57,6 +70,13 @@ export const api: QuickBiteApi = {
   getPolicy: (policyId) => call((client) => client.getPolicy(policyId)),
   sendFeedback: (feedback) => call((client) => client.sendFeedback(feedback)),
 };
+
+/** Look the email up and, if it belongs to a customer, start their session. */
+export async function signIn(email: string): Promise<Customer> {
+  const customer = await api.login({ email: email.trim().toLowerCase() });
+  useSession.getState().setCustomer(customer);
+  return customer;
+}
 
 /** Ping GET /health. In live mode this is also what ends a fallback. */
 export async function checkHealth(): Promise<void> {

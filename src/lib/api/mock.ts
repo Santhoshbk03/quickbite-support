@@ -1,13 +1,20 @@
 /**
  * Demo data behind the same QuickBiteApi interface as the live client.
  *
- * Orders and policies come from the fixtures. Chat replies are composed locally: an order ID in the
- * message looks that order up, anything else goes through a small keyword retriever over the policy
- * documents, and a question no policy covers is declined instead of guessed at.
+ * Sign-in accepts the demo accounts in the order fixtures, and every order call is scoped to the
+ * signed-in customer, as the live API is expected to be. Chat replies are composed locally: an order
+ * question looks up one of the customer's orders, anything else goes through a small keyword
+ * retriever over the policy documents, and a question no policy covers is declined.
  */
 import { POLICIES_BY_ID, POLICY_DOCUMENTS } from "@/lib/fixtures/documents";
 import type { FixtureDocument } from "@/lib/fixtures/documents";
-import { findOrder, normalizeOrderId, ORDERS, toApiOrder } from "@/lib/fixtures/orders";
+import {
+  findCustomer,
+  normalizeOrderId,
+  ordersForCustomer,
+  toApiOrder,
+} from "@/lib/fixtures/orders";
+import type { FixtureOrder } from "@/lib/fixtures/orders";
 import { formatAmount, formatClock, formatRelativeDay, truncate } from "@/lib/format";
 import { createId } from "@/lib/ids";
 import {
@@ -67,17 +74,23 @@ type ReplyBody = Omit<ChatResponse, "message_id">;
 
 const ORDER_ID = /\bQB[\s-]?\d{4}[\s-]?\d{6}\b/i;
 const ORDER_INTENT =
-  /\b(where(?:'s| is)|track|status of|when will)\b[^.?!]*\b(order|food)\b|\border status\b|\bis my order\b/i;
+  /\b(where(?:'s| is)|track|status of|when will)\b[^.?!]*\b(order|food)\b|\border status\b|\bis my (?:order|food)\b|\b(?:latest|last|recent|current|cancelled|canceled) orders?\b|\bmy orders\b/i;
+/** Questions that name which order they mean, so an order from earlier in the chat doesn't apply. */
+const NAMES_AN_ORDER = /\b(latest|last|recent|current|cancel)/i;
 const GREETING = /^(hi|hello|hey|good (morning|afternoon|evening))\b/i;
 const THANKS = /^(thanks|thank you|thx|ty)\b/i;
 
-const EXAMPLE_ORDER_ID = "QB-2026-481213";
+const LATEST_ORDER_QUESTION = "Where is my latest order?";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   month: "short",
   day: "numeric",
 });
+
+function reply(body: Pick<ReplyBody, "answer"> & Partial<ReplyBody>): ReplyBody {
+  return { sources: [], order: null, refused: false, suggestions: [], ...body };
+}
 
 function bulletList(lines: string[]): string {
   return lines.map((line) => `- ${line}`).join("\n");
@@ -143,8 +156,9 @@ function describeOrder(order: Order, now: Date): Omit<ReplyBody, "order" | "refu
       bullets.push(`A **${formatAmount(amount, currency)}** refund${destination} ${phrase}.`);
     }
     const expectedBy = readString(order.refund, "expected_by");
-    if (expectedBy)
+    if (expectedBy) {
       bullets.push(`It should reach you by **${dateFormatter.format(new Date(expectedBy))}**.`);
+    }
 
     policy =
       by === "customer"
@@ -221,23 +235,45 @@ function describeOrder(order: Order, now: Date): Omit<ReplyBody, "order" | "refu
   };
 }
 
-function orderReply(rawId: string, now: Date): ReplyBody {
-  const fixture = findOrder(rawId);
-  if (!fixture) {
-    const id = normalizeOrderId(rawId) ?? rawId.toUpperCase();
-    return {
-      answer: `I couldn't find an order with the ID **${id}**.\n\n${bulletList([
-        `Check the ID on your order confirmation. It looks like \`${EXAMPLE_ORDER_ID}\`.`,
-        "Your recent orders are also listed on the [Orders page](/orders).",
-      ])}`,
-      sources: [],
-      order: null,
-      refused: false,
-      suggestions: [`Where is my order ${EXAMPLE_ORDER_ID}?`],
-    };
-  }
+function orderReply(fixture: FixtureOrder, orders: readonly FixtureOrder[], now: Date): ReplyBody {
   const order = toApiOrder(fixture, now);
-  return { ...describeOrder(order, now), order, refused: false };
+  const described = describeOrder(order, now);
+  const otherActive = orders
+    .filter((other) => other !== fixture && isActiveOrder(other.record.status))
+    .map((other) => `Where is my order ${other.record.order_id}?`);
+  return reply({
+    ...described,
+    order,
+    suggestions: [...(described.suggestions ?? []), ...otherActive].slice(0, 3),
+  });
+}
+
+function orderNotFound(id: string): ReplyBody {
+  return reply({
+    answer: `I couldn't find an order with the ID **${id}** on your account.\n\n${bulletList([
+      "Check the ID on your order confirmation.",
+      "All your orders are listed on the [Orders page](/orders).",
+    ])}`,
+    suggestions: [LATEST_ORDER_QUESTION],
+  });
+}
+
+/** For "where is my order?" without an ID: the order the customer most likely means. */
+function pickOrder(
+  orders: readonly FixtureOrder[],
+  message: string,
+  now: Date,
+): FixtureOrder | null {
+  if (/cancel/i.test(message)) {
+    const cancelled = orders.find((order) => order.record.status === "cancelled");
+    if (cancelled) return cancelled;
+  }
+  const active = orders.filter((order) => isActiveOrder(order.record.status));
+  if (/\b(late|delay|delayed|long)\b/i.test(message)) {
+    const late = active.find((order) => orderTiming(toApiOrder(order, now), now.getTime()).isLate);
+    if (late) return late;
+  }
+  return active[0] ?? orders[0] ?? null;
 }
 
 function policyReply(chunks: RetrievedChunk[]): ReplyBody {
@@ -254,82 +290,76 @@ function policyReply(chunks: RetrievedChunk[]): ReplyBody {
     (document) => document.category === primary?.category && !documents.includes(document),
   ).slice(0, 2);
 
-  return {
+  return reply({
     answer: `${lead}\n\n${bulletList(gists.filter((gist): gist is string => Boolean(gist)))}`,
     sources: documents.map((document) =>
       toSource(document, chunks.find((chunk) => chunk.document === document)?.chunkIndex),
     ),
-    order: null,
-    refused: false,
     suggestions: related.map((document) => `Tell me about ${document.title}`),
-  };
+  });
 }
 
-const REFUSAL: ReplyBody = {
+const REFUSAL = reply({
   answer: [
     "I couldn't find anything in QuickBite's support policies that covers that, so I'd rather not guess.",
     "",
     "I can help with:",
     bulletList([
-      `**Orders**: share an order ID such as \`${EXAMPLE_ORDER_ID}\` and I'll check on it.`,
+      "**Your orders**: ask where your latest order is, or share an order ID.",
       "**Refunds and cancellations**",
       "**Delivery, payments, and your account**",
     ]),
   ].join("\n"),
-  sources: [],
-  order: null,
   refused: true,
-  suggestions: [`Where is my order ${EXAMPLE_ORDER_ID}?`, "How long do UPI refunds take?"],
-};
+  suggestions: [LATEST_ORDER_QUESTION, "How long do UPI refunds take?"],
+});
 
-function compose(request: ChatRequest, now: Date): ReplyBody {
+const NO_ORDERS = reply({
+  answer: "I don't see any orders on your account yet. Once you place one, I can check on it here.",
+  suggestions: ["How do refunds work?"],
+});
+
+function compose(request: ChatRequest, orders: readonly FixtureOrder[], now: Date): ReplyBody {
   const message = request.message.trim();
   const wordCount = message.split(/\s+/).length;
+  const findOwned = (rawId: string) => {
+    const id = normalizeOrderId(rawId);
+    return id ? (orders.find((order) => order.record.order_id === id) ?? null) : null;
+  };
 
-  const orderId = ORDER_ID.exec(message)?.[0];
-  if (orderId) return orderReply(orderId, now);
+  const mentionedId = ORDER_ID.exec(message)?.[0];
+  if (mentionedId) {
+    // Orders on other accounts are reported as not found, never as someone else's.
+    const fixture = findOwned(mentionedId);
+    return fixture
+      ? orderReply(fixture, orders, now)
+      : orderNotFound(normalizeOrderId(mentionedId) ?? mentionedId.toUpperCase());
+  }
 
   if (wordCount <= 4 && THANKS.test(message)) {
-    return {
-      answer: "You're welcome! Is there anything else I can help with?",
-      sources: [],
-      order: null,
-      refused: false,
-      suggestions: [],
-    };
+    return reply({ answer: "You're welcome! Is there anything else I can help with?" });
   }
   if (wordCount <= 4 && GREETING.test(message)) {
-    return {
+    return reply({
       answer: `Hi! I'm the QuickBite support assistant.\n\n${bulletList([
-        `Ask about an order with its ID, such as \`${EXAMPLE_ORDER_ID}\`.`,
+        "Ask about your orders, for example where your latest one is.",
         "Or ask about refunds, delivery, payments, and other policies.",
       ])}`,
-      sources: [],
-      order: null,
-      refused: false,
-      suggestions: [`Where is my order ${EXAMPLE_ORDER_ID}?`, "How long do UPI refunds take?"],
-    };
+      suggestions: [LATEST_ORDER_QUESTION, "How long do UPI refunds take?"],
+    });
   }
 
   if (ORDER_INTENT.test(message)) {
-    // A follow-up such as "is my order late?" refers to the last order mentioned in the conversation.
-    const previousId = request.history
-      .toReversed()
-      .map((turn) => ORDER_ID.exec(turn.content)?.[0])
-      .find(Boolean);
-    if (previousId) return orderReply(previousId, now);
-    return {
-      answer: `Happy to check on your order. What's the order ID?\n\n${bulletList([
-        `You'll find it on your order confirmation, for example \`${EXAMPLE_ORDER_ID}\`.`,
-        "Your recent orders are also listed on the [Orders page](/orders).",
-      ])}`,
-      sources: [],
-      order: null,
-      refused: false,
-      suggestions: ORDERS.slice(0, 2).map(
-        (fixture) => `Where is my order ${fixture.record.order_id}?`,
-      ),
-    };
+    // A follow-up such as "is my order late?" refers to the order discussed earlier in the chat.
+    const previous = NAMES_AN_ORDER.test(message)
+      ? null
+      : request.history
+          .toReversed()
+          .map((turn) => ORDER_ID.exec(turn.content)?.[0])
+          .map((id) => (id ? findOwned(id) : null))
+          .find((fixture) => fixture !== null);
+    const fixture = previous ?? pickOrder(orders, message, now);
+    return fixture ? orderReply(fixture, orders, now) : NO_ORDERS;
   }
 
   const chunks = retrieve(message);
@@ -338,7 +368,14 @@ function compose(request: ChatRequest, now: Date): ReplyBody {
 
 /* Client ---------------------------------------------------------------------------------------*/
 
-export function createMockApi(): QuickBiteApi {
+export function createMockApi(getCustomerEmail: () => string | null): QuickBiteApi {
+  /** The signed-in customer's orders; a 401 when nobody is signed in, like the live API. */
+  const customerOrders = (): FixtureOrder[] => {
+    const email = getCustomerEmail();
+    if (!email) throw new ApiError("http", "Sign in to continue.", 401);
+    return ordersForCustomer(email);
+  };
+
   return {
     health: async () => ({
       status: "ok",
@@ -347,22 +384,31 @@ export function createMockApi(): QuickBiteApi {
       documents: POLICY_DOCUMENTS.length,
     }),
 
+    login: async ({ email }) => {
+      await latency(450);
+      const customer = findCustomer(email);
+      if (!customer) throw new ApiError("http", "No account found for that email.", 404);
+      return { email: customer.email, name: customer.name };
+    },
+
     chat: async (request) => {
+      const orders = customerOrders();
       await latency(900);
-      return { message_id: createId("msg"), ...compose(request, new Date()) };
+      return { message_id: createId("msg"), ...compose(request, orders, new Date()) };
     },
 
     listOrders: async () => {
+      const orders = customerOrders();
       await latency(350);
       const now = new Date();
-      return ORDERS.map((fixture) => toApiOrder(fixture, now)).sort(
-        (a, b) => Date.parse(b.timestamps.placed_at) - Date.parse(a.timestamps.placed_at),
-      );
+      return orders.map((fixture) => toApiOrder(fixture, now));
     },
 
     getOrder: async (orderId) => {
+      const orders = customerOrders();
       await latency(300);
-      const fixture = findOrder(orderId);
+      const id = normalizeOrderId(orderId);
+      const fixture = orders.find((order) => order.record.order_id === id);
       if (!fixture) throw new ApiError("http", "Order not found", 404);
       return toApiOrder(fixture, new Date());
     },

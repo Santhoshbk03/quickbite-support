@@ -2,8 +2,8 @@
  * The API contract as Zod schemas: the single source of truth for what the backend sends.
  *
  * Responses are validated where they enter the app, so a contract mismatch fails with a readable
- * message instead of rendering garbage. Unknown fields are stripped, which is also how customer
- * identifiers (customer_email, customer_id) are kept out of the UI even if a backend sends them.
+ * message instead of rendering garbage. Unknown fields are stripped, which also keeps the customer
+ * identifiers stored on order records (customer_email, customer_id) out of order views.
  * Documented for backend developers in docs/API.md.
  */
 import { z } from "zod";
@@ -19,6 +19,19 @@ export const HealthSchema = z.object({
   model: z.string().nullish(),
   documents: z.number().int().nonnegative().nullish(),
 });
+
+/* POST /auth/login -----------------------------------------------------------------------------*/
+
+export const LoginRequestSchema = z.object({
+  email: z.email(),
+});
+
+export const CustomerSchema = z.object({
+  email: z.string(),
+  name: z.string().nullish(),
+});
+
+export const LoginResponseSchema = z.object({ customer: CustomerSchema });
 
 /* Orders ---------------------------------------------------------------------------------------*/
 
@@ -153,6 +166,8 @@ export const FeedbackRequestSchema = z.object({
 /* Types ----------------------------------------------------------------------------------------*/
 
 export type Health = z.infer<typeof HealthSchema>;
+export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+export type Customer = z.infer<typeof CustomerSchema>;
 export type Order = z.infer<typeof OrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type PolicySummary = z.infer<typeof PolicySummarySchema>;
@@ -166,6 +181,7 @@ export type FeedbackRequest = z.infer<typeof FeedbackRequestSchema>;
 /** Everything the UI can ask of the backend. The live and mock clients both implement this. */
 export interface QuickBiteApi {
   health(): Promise<Health>;
+  login(request: LoginRequest): Promise<Customer>;
   chat(request: ChatRequest): Promise<ChatResponse>;
   listOrders(): Promise<Order[]>;
   getOrder(orderId: string): Promise<Order>;

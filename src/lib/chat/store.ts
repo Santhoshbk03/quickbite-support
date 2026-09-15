@@ -1,6 +1,7 @@
 /**
- * Conversations, persisted to localStorage. One request at a time: while a reply is pending the
- * composer is disabled everywhere.
+ * Conversations, persisted to localStorage and owned by the signed-in customer: signing out, or in
+ * as someone else, clears them. One request at a time: while a reply is pending the composer is
+ * disabled everywhere.
  */
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -50,10 +51,14 @@ export interface Conversation {
 interface ChatState {
   /** False until localStorage has been read. Actions are ignored before then. */
   hydrated: boolean;
+  /** Email of the customer these conversations belong to. */
+  ownerEmail: string | null;
   conversations: Conversation[];
   activeId: string | null;
   /** The conversation waiting on a reply, if any. */
   pendingId: string | null;
+  /** Hand the history to a customer (or to nobody): a different owner starts from empty. */
+  resetFor: (email: string | null) => void;
   newConversation: () => void;
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
@@ -131,9 +136,15 @@ export const useChatStore = create<ChatState>()(
 
       return {
         hydrated: false,
+        ownerEmail: null,
         conversations: [],
         activeId: null,
         pendingId: null,
+
+        resetFor: (email) => {
+          if (get().ownerEmail === email) return;
+          set({ ownerEmail: email, conversations: [], activeId: null, pendingId: null });
+        },
 
         newConversation: () => set({ activeId: null }),
 
@@ -239,11 +250,15 @@ export const useChatStore = create<ChatState>()(
       };
     },
     {
-      name: "quickbite.chat.v2",
-      version: 2,
+      name: "quickbite.chat.v3",
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
-      partialize: (state) => ({ conversations: state.conversations, activeId: state.activeId }),
+      partialize: (state) => ({
+        ownerEmail: state.ownerEmail,
+        conversations: state.conversations,
+        activeId: state.activeId,
+      }),
       onRehydrateStorage: () => () => useChatStore.setState({ hydrated: true }),
     },
   ),

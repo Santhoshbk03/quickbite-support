@@ -6,12 +6,16 @@ import { z } from "zod";
 import {
   ChatResponseSchema,
   HealthSchema,
+  LoginResponseSchema,
   OrderSchema,
   OrdersResponseSchema,
   PoliciesResponseSchema,
   PolicySchema,
 } from "./types";
 import type { QuickBiteApi } from "./types";
+
+/** Identifies the signed-in customer on every request. */
+export const CUSTOMER_EMAIL_HEADER = "X-Customer-Email";
 
 export type ApiErrorKind = "network" | "timeout" | "http" | "invalid";
 
@@ -49,6 +53,12 @@ export class ApiError extends Error {
 
 const TIMEOUT_MS = { health: 5_000, chat: 60_000, default: 10_000 } as const;
 
+interface RequestOptions {
+  method?: "GET" | "POST";
+  body?: unknown;
+  timeoutMs?: number;
+}
+
 function describeHttpError(status: number, body: unknown): string {
   // FastAPI's error shape: {"detail": "Order not found"}.
   const detail =
@@ -56,6 +66,7 @@ function describeHttpError(status: number, body: unknown): string {
       ? (body as { detail: unknown }).detail
       : null;
   if (typeof detail === "string" && detail.trim()) return detail;
+  if (status === 401) return "Your session has ended. Sign in again.";
   if (status === 404) return "Not found.";
   if (status === 422) return "The API rejected the request as invalid.";
   if (status === 429) return "Too many requests. Wait a moment and try again.";
@@ -67,16 +78,13 @@ async function request<T>(
   baseUrl: string,
   path: string,
   schema: z.ZodType<T>,
-  {
-    method = "GET",
-    body,
-    timeoutMs = TIMEOUT_MS.default,
-  }: {
-    method?: "GET" | "POST";
-    body?: unknown;
-    timeoutMs?: number;
-  } = {},
+  { method = "GET", body, timeoutMs = TIMEOUT_MS.default }: RequestOptions,
+  customerEmail: string | null,
 ): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (customerEmail) headers[CUSTOMER_EMAIL_HEADER] = customerEmail;
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -85,10 +93,7 @@ async function request<T>(
     try {
       response = await fetch(`${baseUrl}${path}`, {
         method,
-        headers:
-          body === undefined
-            ? { Accept: "application/json" }
-            : { Accept: "application/json", "Content-Type": "application/json" },
+        headers,
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
@@ -132,30 +137,34 @@ async function request<T>(
   }
 }
 
-export function createHttpApi(baseUrl: string): QuickBiteApi {
+export function createHttpApi(
+  baseUrl: string,
+  getCustomerEmail: () => string | null,
+): QuickBiteApi {
+  function send<T>(path: string, schema: z.ZodType<T>, options: RequestOptions = {}): Promise<T> {
+    return request(baseUrl, path, schema, options, getCustomerEmail());
+  }
+
   return {
-    health: () => request(baseUrl, "/health", HealthSchema, { timeoutMs: TIMEOUT_MS.health }),
+    health: () => send("/health", HealthSchema, { timeoutMs: TIMEOUT_MS.health }),
+
+    login: async (body) =>
+      (await send("/auth/login", LoginResponseSchema, { method: "POST", body })).customer,
 
     chat: (body) =>
-      request(baseUrl, "/chat", ChatResponseSchema, {
-        method: "POST",
-        body,
-        timeoutMs: TIMEOUT_MS.chat,
-      }),
+      send("/chat", ChatResponseSchema, { method: "POST", body, timeoutMs: TIMEOUT_MS.chat }),
 
-    listOrders: async () => (await request(baseUrl, "/orders", OrdersResponseSchema)).orders,
+    listOrders: async () => (await send("/orders", OrdersResponseSchema)).orders,
 
-    getOrder: (orderId) => request(baseUrl, `/orders/${encodeURIComponent(orderId)}`, OrderSchema),
+    getOrder: (orderId) => send(`/orders/${encodeURIComponent(orderId)}`, OrderSchema),
 
-    listPolicies: async () =>
-      (await request(baseUrl, "/policies", PoliciesResponseSchema)).policies,
+    listPolicies: async () => (await send("/policies", PoliciesResponseSchema)).policies,
 
-    getPolicy: (policyId) =>
-      request(baseUrl, `/policies/${encodeURIComponent(policyId)}`, PolicySchema),
+    getPolicy: (policyId) => send(`/policies/${encodeURIComponent(policyId)}`, PolicySchema),
 
     sendFeedback: async (body) => {
       // Any 2xx is success: 204 No Content or a small JSON acknowledgement.
-      await request(baseUrl, "/feedback", z.unknown(), { method: "POST", body });
+      await send("/feedback", z.unknown(), { method: "POST", body });
     },
   };
 }

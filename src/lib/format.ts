@@ -71,3 +71,14 @@ export function codePointOffsetToIndex(text: string, codePoints: number): number
 export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
+
+/** "Priya Sharma" → "PS"; an email uses the part before the @. */
+export function initials(nameOrEmail: string): string {
+  const words = (nameOrEmail.split("@")[0] ?? "").split(/[\s._-]+/).filter(Boolean);
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => word.charAt(0).toUpperCase())
+      .join("") || "?"
+  );
+}
