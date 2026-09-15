@@ -7,7 +7,7 @@ in the knowledge base is close enough to the question. And every answer can be t
 and their distances, which ones it actually cited, the tool calls it made, where the milliseconds went, and what it
 cost.
 
-**Live demo → [LIVE_URL](LIVE_URL)**
+**Live demo → [quickbite-support.vercel.app](https://quickbite-support.vercel.app)**
 
 The demo runs on a mock backend that implements the same streaming API contract as the Python service. It works
 even when that service is asleep, and the header says so honestly ("Demo mode").
