@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { EmptyState, EndpointTag, ErrorState } from "@/components/site/page-states";
+import { EmptyState, ErrorState } from "@/components/site/page-states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/primitives";
@@ -27,10 +27,6 @@ export function PolicyDetail({ policyId }: { policyId: string }) {
         <ArrowLeft className="size-4" aria-hidden />
         All policies
       </Link>
-
-      <div className="mt-4">
-        <EndpointTag method="GET" path={`/policies/${policyId}`} />
-      </div>
 
       {query.status === "loading" ? (
         <div className="mt-4 flex flex-col gap-3" aria-label="Loading policy">

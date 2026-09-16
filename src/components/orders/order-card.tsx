@@ -252,6 +252,9 @@ function StatusStrip({
 
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line bg-sunken px-4 py-3 sm:px-5">
+      {timing.isOverdue ? (
+        <p className="text-[0.8125rem] font-medium text-danger">Past the latest estimate</p>
+      ) : null}
       {timing.minutesRemaining != null ? (
         <p className="flex items-baseline gap-1.5">
           <span className="font-display-tight text-[1.75rem] font-medium leading-none tabular text-fg">

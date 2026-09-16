@@ -36,37 +36,32 @@ pnpm dev
 
 Then open http://localhost:3000.
 
-## Connecting a backend
+## Connecting the backend
 
-Set these in `.env.local`, or in your hosting provider's environment settings:
+The live client in `src/lib/api/http.ts` is written against the QuickBite FastAPI backend. The backend doesn't send CORS headers, so the browser calls a same-origin proxy at `/api/backend/*`, which forwards to it. Put this in `.env.local` and restart `pnpm dev`:
 
 ```bash
 NEXT_PUBLIC_API_MODE=live
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=/api/backend
+BACKEND_URL=http://127.0.0.1:8000
 ```
 
-The backend needs eight JSON endpoints. After sign-in, the frontend sends the customer's email as an `X-Customer-Email` header so the backend can return only that customer's data.
+| Frontend         | Backend                            |
+| ---------------- | ---------------------------------- |
+| Sign in          | `POST /userdetails?email=`         |
+| Orders           | `POST /user_orders_id?email=`      |
+| Order detail     | `POST /user_order_detail?orderid=` |
+| Chat             | `POST /chat`                       |
+| API status badge | `GET /openapi.json`                |
 
-| Method | Path                    | Purpose                                   |
-| ------ | ----------------------- | ----------------------------------------- |
-| GET    | `/health`               | API status                                |
-| POST   | `/auth/login`           | Check that an email belongs to a customer |
-| POST   | `/chat`                 | Answer a message                          |
-| GET    | `/orders`               | The customer's orders                     |
-| GET    | `/orders/{order_id}`    | One of the customer's orders              |
-| GET    | `/policies`             | List policies                             |
-| GET    | `/policies/{policy_id}` | One policy with its sections              |
-| POST   | `/feedback`             | Thumbs up or down on an answer            |
-
-[docs/API.md](docs/API.md) has the full request and response shapes, how sign-in works, error handling, and CORS setup.
-
-> Email-only sign-in identifies a customer but doesn't prove who they are, so it suits demo data. docs/API.md explains how to switch to a signed token for real customers.
+Policies and feedback don't have backend endpoints yet. [docs/BACKEND.md](docs/BACKEND.md) explains how responses are adapted and lists backend issues found while connecting it. [docs/API.md](docs/API.md) is the fuller contract the frontend was designed around.
 
 ## Project structure
 
 ```
 src/
   app/
+    api/backend/        Proxy to the FastAPI backend (it has no CORS)
     login/              Login page
     (app)/              Signed-in pages: / (chat), /orders, /orders/[id], /policies, /policies/[id]
   components/
@@ -78,11 +73,12 @@ src/
     ui/                 Buttons, badges, sidebar, timeline, tooltips
   hooks/                useApiQuery, useCopy, useMediaQuery
   lib/
-    api/                types.ts (Zod contract), http.ts (live client), mock.ts (demo data), index.ts (api + fallback)
+    api/                types.ts (Zod contract), http.ts (FastAPI backend client), mock.ts (demo data), index.ts (api + fallback)
     auth/session.ts     The signed-in customer (Zustand, saved to localStorage)
     chat/store.ts       Conversations (Zustand, saved to localStorage)
     fixtures/           Sample customers, orders, and policy documents
-docs/API.md             API reference for the backend
+docs/API.md             The contract the frontend was designed around
+docs/BACKEND.md         How the FastAPI backend is connected today
 ```
 
 The UI only reads data through `api` from `@/lib/api`. Switching from demo data to a real backend changes no component code.

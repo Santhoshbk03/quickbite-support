@@ -63,6 +63,7 @@ function toSource(document: FixtureDocument, chunkIndex = 0): Source {
     id: document.slug,
     title: document.title,
     snippet: chunk ? truncate(chunk.text, 180) : null,
+    href: `/policies/${document.slug}`,
   };
 }
 

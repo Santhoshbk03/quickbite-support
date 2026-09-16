@@ -34,7 +34,8 @@ export function Composer({
     if (!canSend) return;
     onSend(value);
     setValue("");
-    requestAnimationFrame(resize);
+    // Back to one line right away; the cleared value only renders on the next update.
+    if (textareaRef.current) textareaRef.current.style.height = "";
   };
 
   return (

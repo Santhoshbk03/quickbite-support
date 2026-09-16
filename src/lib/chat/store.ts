@@ -14,6 +14,19 @@ import { createId } from "@/lib/ids";
 const MAX_CONVERSATIONS = 30;
 const MAX_HISTORY_TURNS = 20;
 
+/** localStorage that never throws: if long backend transcripts fill the quota, saving is skipped. */
+const safeLocalStorage = {
+  getItem: (name: string) => localStorage.getItem(name),
+  setItem: (name: string, value: string) => {
+    try {
+      localStorage.setItem(name, value);
+    } catch (error) {
+      console.warn("Couldn't save conversations in this browser.", error);
+    }
+  },
+  removeItem: (name: string) => localStorage.removeItem(name),
+};
+
 export type Rating = "up" | "down";
 
 export interface UserMessage {
@@ -46,6 +59,8 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
+  /** The live backend's own transcript, sent back with the next message. */
+  transcript?: unknown[];
 }
 
 interface ChatState {
@@ -95,8 +110,15 @@ export const useChatStore = create<ChatState>()(
 
         set({ pendingId: conversationId });
         let reply: AssistantMessage;
+        let transcript: unknown[] | undefined;
         try {
-          const response = await api.chat({ session_id: conversationId, message: text, history });
+          const response = await api.chat({
+            session_id: conversationId,
+            message: text,
+            history,
+            transcript: conversation.transcript,
+          });
+          transcript = response.transcript ?? undefined;
           reply = {
             id: response.message_id,
             role: "assistant",
@@ -131,6 +153,7 @@ export const useChatStore = create<ChatState>()(
           ...item,
           updatedAt: reply.createdAt,
           messages: [...item.messages, reply],
+          ...(transcript ? { transcript } : {}),
         }));
       }
 
@@ -252,7 +275,7 @@ export const useChatStore = create<ChatState>()(
     {
       name: "quickbite.chat.v3",
       version: 3,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeLocalStorage),
       skipHydration: true,
       partialize: (state) => ({
         ownerEmail: state.ownerEmail,

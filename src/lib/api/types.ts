@@ -11,6 +11,15 @@ import { z } from "zod";
 /** ISO 8601. An offset (`+05:30`) is preferred; a naive local time is accepted. */
 const timestamp = z.iso.datetime({ offset: true, local: true });
 
+/**
+ * A free-form record such as a refund. Some backend records send a bare boolean instead (for example
+ * `"refund": true`): true is kept as a present record with no details, false as no record.
+ */
+const looseRecord = z.preprocess(
+  (value) => (value === true ? {} : value === false ? null : value),
+  z.record(z.string(), z.unknown()).nullish(),
+);
+
 /* GET /health ----------------------------------------------------------------------------------*/
 
 export const HealthSchema = z.object({
@@ -97,9 +106,9 @@ export const OrderSchema = z.object({
     })
     .nullish(),
   notes_to_restaurant: z.string().nullish(),
-  substitution: z.record(z.string(), z.unknown()).nullish(),
-  cancellation: z.record(z.string(), z.unknown()).nullish(),
-  refund: z.record(z.string(), z.unknown()).nullish(),
+  substitution: looseRecord,
+  cancellation: looseRecord,
+  refund: looseRecord,
   issues: z.array(z.unknown()).nullish(),
 });
 
@@ -134,13 +143,16 @@ export const ChatRequestSchema = z.object({
   message: z.string().min(1).max(2000),
   /** Earlier turns, oldest first, not including `message`. */
   history: z.array(ChatTurnSchema).max(20),
+  /** The backend's own transcript from its previous reply, sent back unchanged. */
+  transcript: z.array(z.unknown()).optional(),
 });
 
 export const SourceSchema = z.object({
-  /** A policy id, so the UI can link to /policies/{id}. */
   id: z.string(),
   title: z.string(),
   snippet: z.string().nullish(),
+  /** Where the source chip links to, such as /policies/{id}. No link when absent. */
+  href: z.string().nullish(),
 });
 
 export const ChatResponseSchema = z.object({
@@ -153,6 +165,8 @@ export const ChatResponseSchema = z.object({
   /** True when no policy covers the question and the assistant declined to answer. */
   refused: z.boolean().default(false),
   suggestions: z.array(z.string()).nullish(),
+  /** Conversation state to send back with the next message, if the backend keeps any. */
+  transcript: z.array(z.unknown()).nullish(),
 });
 
 /* POST /feedback -------------------------------------------------------------------------------*/

@@ -16,7 +16,7 @@ import { createMockApi } from "./mock";
 import type { Customer, Health, QuickBiteApi } from "./types";
 
 export * from "./types";
-export { ApiError, CUSTOMER_EMAIL_HEADER } from "./http";
+export { ApiError } from "./http";
 export type { ApiErrorKind } from "./http";
 export type { ApiMode } from "./env";
 

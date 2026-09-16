@@ -4,7 +4,7 @@ import { ArrowLeft, MessagesSquare, SearchX } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { EmptyState, EndpointTag, ErrorState } from "@/components/site/page-states";
+import { EmptyState, ErrorState } from "@/components/site/page-states";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/primitives";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -28,8 +28,7 @@ export function OrderDetail({ orderId }: { orderId: string }) {
       </Link>
 
       <header className="mb-6 mt-4">
-        <EndpointTag method="GET" path={`/orders/${orderId}`} />
-        <h1 className="mt-3 font-display-tight text-3xl font-medium text-fg">Order {orderId}</h1>
+        <h1 className="font-display-tight text-3xl font-medium text-fg">Order {orderId}</h1>
       </header>
 
       {query.status === "loading" ? (

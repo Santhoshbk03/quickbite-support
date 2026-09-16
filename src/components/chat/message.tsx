@@ -24,6 +24,9 @@ import { useChatStore } from "@/lib/chat/store";
 import type { AssistantMessage, UserMessage } from "@/lib/chat/store";
 import { cn } from "@/lib/utils";
 
+const SOURCE_CHIP =
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-1 px-2.5 py-1 text-xs text-fg-muted transition-colors hover:border-brand-line hover:text-fg";
+
 export function UserBubble({ message }: { message: UserMessage }) {
   return (
     <div className="flex scroll-mt-4 justify-end">
@@ -91,14 +94,21 @@ export function AssistantReply({
                 <ul className="flex flex-wrap gap-1.5">
                   {message.sources.map((source) => (
                     <li key={source.id} className="max-w-full">
-                      <Link
-                        href={`/policies/${encodeURIComponent(source.id)}`}
-                        title={source.snippet ?? undefined}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-1 px-2.5 py-1 text-xs text-fg-muted transition-colors hover:border-brand-line hover:text-fg"
-                      >
-                        <FileText className="size-3.5 shrink-0 text-brand-ink" aria-hidden />
-                        <span className="truncate">{source.title}</span>
-                      </Link>
+                      {source.href ? (
+                        <Link
+                          href={source.href}
+                          title={source.snippet ?? undefined}
+                          className={SOURCE_CHIP}
+                        >
+                          <FileText className="size-3.5 shrink-0 text-brand-ink" aria-hidden />
+                          <span className="truncate">{source.title}</span>
+                        </Link>
+                      ) : (
+                        <span title={source.snippet ?? undefined} className={SOURCE_CHIP}>
+                          <FileText className="size-3.5 shrink-0 text-brand-ink" aria-hidden />
+                          <span className="truncate">{source.title}</span>
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>

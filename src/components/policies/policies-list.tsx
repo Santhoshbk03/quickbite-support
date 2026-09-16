@@ -4,7 +4,7 @@ import { BookOpenText, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { EmptyState, EndpointTag, ErrorState } from "@/components/site/page-states";
+import { EmptyState, ErrorState } from "@/components/site/page-states";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/primitives";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -33,8 +33,7 @@ export function PoliciesList() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <header className="mb-6">
-        <EndpointTag method="GET" path="/policies" />
-        <h1 className="mt-3 font-display-tight text-3xl font-medium text-fg">Support policies</h1>
+        <h1 className="font-display-tight text-3xl font-medium text-fg">Support policies</h1>
         <p className="mt-1.5 text-sm text-fg-muted">The documents the assistant answers from.</p>
       </header>
 

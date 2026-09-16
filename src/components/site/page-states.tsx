@@ -70,13 +70,3 @@ export function EmptyState({
     </div>
   );
 }
-
-/** Small monospace label showing which API powers a page. */
-export function EndpointTag({ method, path }: { method: "GET" | "POST"; path: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-1 px-2.5 py-0.5 font-mono text-2xs text-fg-subtle">
-      <span className="text-brand-ink">{method}</span>
-      {path}
-    </span>
-  );
-}

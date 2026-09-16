@@ -167,6 +167,8 @@ export interface OrderTiming {
   minutesVsPromise: number | null;
   isLate: boolean;
   minutesRemaining: number | null;
+  /** Still in progress, but the latest estimate has already passed. */
+  isOverdue: boolean;
   minutesSinceDelivery: number | null;
 }
 
@@ -185,9 +187,10 @@ export function orderTiming(order: Order, reference: number): OrderTiming {
     minutesVsPromise,
     isLate: minutesVsPromise !== null && minutesVsPromise > 0,
     minutesRemaining:
-      isActiveOrder(order.status) && finalEta !== null
+      isActiveOrder(order.status) && finalEta !== null && finalEta > reference
         ? Math.max(1, Math.round((finalEta - reference) / 60_000))
         : null,
+    isOverdue: isActiveOrder(order.status) && finalEta !== null && finalEta <= reference,
     minutesSinceDelivery:
       delivered !== null ? Math.max(0, Math.round((reference - delivered) / 60_000)) : null,
   };

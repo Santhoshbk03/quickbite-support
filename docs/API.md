@@ -1,5 +1,7 @@
 # QuickBite Support API
 
+> **Status.** This is the contract the frontend was designed around. The local FastAPI backend uses different routes today; [BACKEND.md](BACKEND.md) describes how the frontend is connected to it.
+
 The frontend needs **8 JSON endpoints**. Until they exist it runs on built-in demo data. To connect a backend:
 
 ```bash

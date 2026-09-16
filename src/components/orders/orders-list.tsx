@@ -3,7 +3,7 @@
 import { ChevronRight, Package } from "lucide-react";
 import Link from "next/link";
 
-import { EmptyState, EndpointTag, ErrorState } from "@/components/site/page-states";
+import { EmptyState, ErrorState } from "@/components/site/page-states";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/primitives";
 import { useApiQuery } from "@/hooks/use-api-query";
@@ -24,8 +24,7 @@ export function OrdersList() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
       <header className="mb-6">
-        <EndpointTag method="GET" path="/orders" />
-        <h1 className="mt-3 font-display-tight text-3xl font-medium text-fg">Your orders</h1>
+        <h1 className="font-display-tight text-3xl font-medium text-fg">Your orders</h1>
         <p className="mt-1.5 text-sm text-fg-muted">
           Open an order to see its timeline and charges, or ask support about it.
         </p>
