@@ -17,6 +17,12 @@ import { FullPageLoader } from "./auth-gate";
 
 const emailSchema = z.email();
 
+/** Sign-in emails to offer when a live backend is connected, e.g. NEXT_PUBLIC_DEMO_EMAILS=a@x.com,b@y.com */
+const LIVE_DEMO_EMAILS = (process.env.NEXT_PUBLIC_DEMO_EMAILS ?? "")
+  .split(",")
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+
 /** Only paths on this site, so a crafted link can't send a customer elsewhere after sign-in. */
 function safeNext(value: string | null): string {
   return value && /^\/(?![/\\])/.test(value) && !value.startsWith("/login") ? value : "/";
@@ -87,7 +93,12 @@ export function LoginScreen() {
 
   if (!hydrated || handoffEmail || customer) return <FullPageLoader />;
 
-  const showDemoAccounts = mode === "mock" || fallback;
+  // Demo data has its own sample accounts; a live backend offers the ones named in the env.
+  const demoAccounts: { email: string; name: string | null }[] =
+    mode === "mock" || fallback
+      ? CUSTOMERS.map((account) => ({ email: account.email, name: account.name }))
+      : LIVE_DEMO_EMAILS.map((demoEmail) => ({ email: demoEmail, name: null }));
+  const showDemoAccounts = demoAccounts.length > 0;
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">
@@ -158,7 +169,7 @@ export function LoginScreen() {
                 Demo accounts
               </h2>
               <ul className="mt-3 flex flex-col gap-2">
-                {CUSTOMERS.map((account) => (
+                {demoAccounts.map((account) => (
                   <li key={account.email}>
                     <button
                       type="button"
@@ -173,10 +184,12 @@ export function LoginScreen() {
                         aria-hidden
                         className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink"
                       >
-                        {initials(account.name)}
+                        {initials(account.name ?? account.email)}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-medium text-fg">{account.name}</span>
+                        {account.name ? (
+                          <span className="block text-sm font-medium text-fg">{account.name}</span>
+                        ) : null}
                         <span className="block truncate text-xs text-fg-subtle">
                           {account.email}
                         </span>

@@ -17,6 +17,9 @@ const ROUTES: Readonly<Record<string, "GET" | "POST">> = {
 /** Longer than the browser's own chat timeout, so the browser reports the timeout. */
 const TIMEOUT_MS = 100_000;
 
+/** Seconds the hosting platform lets this function run: a sleeping backend plus an agent reply can be slow. */
+export const maxDuration = 120;
+
 async function forward(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> },

@@ -1,6 +1,6 @@
 # Connecting the FastAPI backend
 
-The frontend's live client ([`src/lib/api/http.ts`](../src/lib/api/http.ts)) is written against the QuickBite FastAPI backend (Swagger at `http://127.0.0.1:8000/docs`). [API.md](API.md) is the fuller contract the frontend was designed around; this page describes what is connected today.
+The frontend's live client ([`src/lib/api/http.ts`](../src/lib/api/http.ts)) is written against the QuickBite FastAPI backend: `http://127.0.0.1:8000` locally, and `https://delivery-agent-4tvc.onrender.com` for the deployed site. [API.md](API.md) is the fuller contract the frontend was designed around; this page describes what is connected today.
 
 ## Setup
 
@@ -15,6 +15,8 @@ BACKEND_URL=http://127.0.0.1:8000
 The backend doesn't send CORS headers, so the browser can't call it directly. It calls `/api/backend/*` on the Next.js server instead ([`src/app/api/backend/[...path]/route.ts`](../src/app/api/backend/%5B...path%5D/route.ts)), which forwards to `BACKEND_URL`. Only the routes below are forwarded.
 
 If the backend is down, the app switches to demo data and shows a banner, then retries every 30 seconds.
+
+**Deployed site (Vercel).** The production environment has `NEXT_PUBLIC_API_MODE=live`, `NEXT_PUBLIC_API_URL=/api/backend`, `BACKEND_URL=https://delivery-agent-4tvc.onrender.com`, and `NEXT_PUBLIC_DEMO_EMAILS=arjun.mehta@example.com`. The `NEXT_PUBLIC_*` values are built into the bundle, so redeploy after changing them. The Render free tier sleeps when idle; the first requests after that can time out, and the app shows demo data until the backend answers a health check.
 
 ## What calls what
 

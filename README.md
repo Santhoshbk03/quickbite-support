@@ -2,7 +2,7 @@
 
 A demo customer support app for a food delivery service. Customers sign in with their email, chat with a support assistant, look up their orders, and read the policies behind every answer.
 
-**Live demo:** [quickbite-support.vercel.app](https://quickbite-support.vercel.app). The demo runs on built-in sample data; pick one of the demo accounts on the login page.
+**Live demo:** [quickbite-support.vercel.app](https://quickbite-support.vercel.app). It's connected to the hosted FastAPI backend; sign in with `arjun.mehta@example.com`. The backend runs on Render's free tier, so the first request after it has been idle can take a minute, and the app shows demo data until it responds.
 
 ## Features
 
@@ -101,6 +101,6 @@ The live demo runs on Vercel.
 
 1. Import the repository into Vercel.
 2. Set `ENABLE_EXPERIMENTAL_COREPACK=1` so Vercel uses the pinned pnpm version.
-3. To use a backend, also set `NEXT_PUBLIC_API_MODE` and `NEXT_PUBLIC_API_URL`.
+3. To use the backend, also set `NEXT_PUBLIC_API_MODE=live`, `NEXT_PUBLIC_API_URL=/api/backend`, `BACKEND_URL` (the backend's URL), and optionally `NEXT_PUBLIC_DEMO_EMAILS`.
 
 Demo mode needs no other environment variables. The `NEXT_PUBLIC_*` values are built into the bundle, so redeploy after changing them.
